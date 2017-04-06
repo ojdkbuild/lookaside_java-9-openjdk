@@ -72,9 +72,8 @@ import java.util.function.Predicate;
  * generally decreases throughput but reduces variability and avoids
  * starvation.
  *
- * <p>This class and its iterator implement all of the
- * <em>optional</em> methods of the {@link Collection} and {@link
- * Iterator} interfaces.
+ * <p>This class and its iterator implement all of the <em>optional</em>
+ * methods of the {@link Collection} and {@link Iterator} interfaces.
  *
  * <p>This class is a member of the
  * <a href="{@docRoot}/../technotes/guides/collections/index.html">
@@ -1227,6 +1226,7 @@ public class ArrayBlockingQueue<E> extends AbstractQueue<E>
                 } else {
                     nextIndex = NONE;
                     nextItem = null;
+                    if (lastRet == REMOVED) detach();
                 }
             } finally {
                 lock.unlock();

@@ -78,6 +78,15 @@
                                                                                                                                      \
   static_field(CompilerToVM::Data,             vm_page_size,                           int)                                          \
                                                                                                                                      \
+  static_field(CompilerToVM::Data,             sizeof_vtableEntry,                     int)                                          \
+  static_field(CompilerToVM::Data,             sizeof_ExceptionTableElement,           int)                                          \
+  static_field(CompilerToVM::Data,             sizeof_LocalVariableTableElement,       int)                                          \
+  static_field(CompilerToVM::Data,             sizeof_ConstantPool,                    int)                                          \
+  static_field(CompilerToVM::Data,             sizeof_SymbolPointer,                   int)                                          \
+  static_field(CompilerToVM::Data,             sizeof_narrowKlass,                     int)                                          \
+  static_field(CompilerToVM::Data,             sizeof_arrayOopDesc,                    int)                                          \
+  static_field(CompilerToVM::Data,             sizeof_BasicLock,                       int)                                          \
+                                                                                                                                     \
   static_field(CompilerToVM::Data,             dsin,                                   address)                                      \
   static_field(CompilerToVM::Data,             dcos,                                   address)                                      \
   static_field(CompilerToVM::Data,             dtan,                                   address)                                      \
@@ -85,6 +94,9 @@
   static_field(CompilerToVM::Data,             dlog,                                   address)                                      \
   static_field(CompilerToVM::Data,             dlog10,                                 address)                                      \
   static_field(CompilerToVM::Data,             dpow,                                   address)                                      \
+                                                                                                                                     \
+  static_field(CompilerToVM::Data,             symbol_init,                            address)                                      \
+  static_field(CompilerToVM::Data,             symbol_clinit,                          address)                                      \
                                                                                                                                      \
   static_field(Abstract_VM_Version,            _features,                              uint64_t)                                     \
                                                                                                                                      \
@@ -429,6 +441,7 @@
   declare_constant(CodeInstaller::HEAP_TOP_ADDRESS)                       \
   declare_constant(CodeInstaller::HEAP_END_ADDRESS)                       \
   declare_constant(CodeInstaller::NARROW_KLASS_BASE_ADDRESS)              \
+  declare_constant(CodeInstaller::NARROW_OOP_BASE_ADDRESS)                \
   declare_constant(CodeInstaller::CRC_TABLE_ADDRESS)                      \
   declare_constant(CodeInstaller::LOG_OF_HEAP_REGION_GRAIN_BYTES)         \
   declare_constant(CodeInstaller::INLINE_CONTIGUOUS_ALLOCATION_SUPPORTED) \
@@ -534,7 +547,6 @@
                                                                           \
   declare_constant(markOopDesc::no_hash)                                  \
                                                                           \
-  declare_constant(Method::_jfr_towrite)                                  \
   declare_constant(Method::_caller_sensitive)                             \
   declare_constant(Method::_force_inline)                                 \
   declare_constant(Method::_dont_inline)                                  \

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="ISO-8859-1"?>
 <?xml-stylesheet type="text/xsl" href="jvmti.xsl"?>
 <!--
- Copyright (c) 2002, 2016, Oracle and/or its affiliates. All rights reserved.
+ Copyright (c) 2002, 2017, Oracle and/or its affiliates. All rights reserved.
  DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
 
  This code is free software; you can redistribute it and/or modify it
@@ -1486,6 +1486,10 @@ jvmtiEnv *jvmti;
       <description>
         Get the current thread.  
         The current thread is the Java programming language thread which has called the function.
+        The function may return <code>NULL</code> in the start phase if the
+        <internallink id="jvmtiCapabilities.can_generate_early_vmstart">
+        <code>can_generate_early_vmstart</code></internallink> capability is enabled
+        and the <code>java.lang.Thread</code> class has not been initialized yet.
         <p/>
         Note that most <jvmti/> functions that take a thread 
         as an argument will accept <code>NULL</code> to mean 
@@ -1498,7 +1502,7 @@ jvmtiEnv *jvmti;
         <param id="thread_ptr">
 	  <outptr><jthread/></outptr>
 	  <description>
-	     On return, points to the current thread.
+	     On return, points to the current thread, or <code>NULL</code>.
 	  </description>
 	</param>
       </parameters>
@@ -12864,11 +12868,13 @@ myInit() {
       If the capability has been added then the VM posts the event as early
       as possible. The VM is capable of executing bytecode but it may not have
       initialized to the point where it can load classes in modules other than
-      <code>java.base</code>. Agents that do load-time instrumentation in this
+      <code>java.base</code>, or even arbitrary classes in <code>java.base</code>.
+      Agents that do load-time instrumentation in this
       phase must take great care when instrumenting code that potentially
-      executes in this phase. Care should also be taken with JNI
-      <code>FindClass</code> as it may not be possible to load classes that are
-      not in the <code>java.base</code> module.
+      executes in this phase. Extreme care should also be taken with JNI
+      <code>FindClass</code> as it may not be possible to load classes and attempts
+      to do so may result in unpredictable behavior, maybe even stability issues
+      on some VM implementations.
       If the capability has not been added then the VM delays posting this
       event until it is capable of loading classes in modules other than
       <code>java.base</code> or the VM has completed its initialization.
@@ -14732,6 +14738,11 @@ typedef void (JNICALL *jvmtiEventVMInit)
           - AddModuleReads, AddModuleExports, AddModuleOpens, AddModuleUses, AddModuleProvides
       Clarified can_redefine_any_classes, can_retransform_any_classes and IsModifiableClass API to
       disallow some implementation defined classes.
+  </change>
+  <change date="12 February 2017" version="9.0.0">
+      Minor update for GetCurrentThread function:
+       - The function may return NULL in the start phase if the
+         can_generate_early_vmstart capability is enabled.
   </change>
 </changehistory>
 

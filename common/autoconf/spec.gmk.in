@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2011, 2016, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2011, 2017, Oracle and/or its affiliates. All rights reserved.
 # DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
 #
 # This code is free software; you can redistribute it and/or modify it
@@ -87,9 +87,8 @@ HOTSPOT_TARGET_CPU := @HOTSPOT_TARGET_CPU@
 HOTSPOT_TARGET_CPU_ARCH := @HOTSPOT_TARGET_CPU_ARCH@
 HOTSPOT_TARGET_CPU_DEFINE := @HOTSPOT_TARGET_CPU_DEFINE@
 
-OPENJDK_TARGET_CPU_BUNDLE:=@OPENJDK_TARGET_CPU_BUNDLE@
-OPENJDK_TARGET_OS_BUNDLE:=@OPENJDK_TARGET_OS_BUNDLE@
 OPENJDK_TARGET_BUNDLE_PLATFORM:=@OPENJDK_TARGET_BUNDLE_PLATFORM@
+JDK_ARCH_ABI_PROP_NAME := @JDK_ARCH_ABI_PROP_NAME@
 
 # We are building on this build system.
 # When not cross-compiling, it is the same as the target.
@@ -575,20 +574,31 @@ BUILD_JAVA=@FIXPATH@ $(BUILD_JDK)/bin/java $(BUILD_JAVA_FLAGS)
 # Use ?= as this can be overridden from bootcycle-spec.gmk
 BOOT_JDK_MODULAR ?= @BOOT_JDK_MODULAR@
 
-INTERIM_OVERRIDE_MODULES := java.compiler jdk.compiler \
-    jdk.jdeps jdk.javadoc jdk.rmic
+INTERIM_LANGTOOLS_OVERRIDE_MODULES := java.compiler jdk.compiler \
+    jdk.jdeps jdk.javadoc
+INTERIM_RMIC_OVERRIDE_MODULES := jdk.rmic
 ifeq ($(BOOT_JDK_MODULAR), true)
-  INTERIM_OVERRIDE_MODULES_ARGS = $(foreach m, $(INTERIM_OVERRIDE_MODULES), \
+  INTERIM_LANGTOOLS_OVERRIDE_MODULES_ARGS = $(foreach m, \
+      $(INTERIM_LANGTOOLS_OVERRIDE_MODULES), \
       --patch-module $m=$(BUILDTOOLS_OUTPUTDIR)/override_modules/$m)
-  INTERIM_LANGTOOLS_ARGS = $(INTERIM_OVERRIDE_MODULES_ARGS)
+  INTERIM_RMIC_OVERRIDE_MODULES_ARGS = $(foreach m, \
+      $(INTERIM_LANGTOOLS_OVERRIDE_MODULES) \
+      $(INTERIM_RMIC_OVERRIDE_MODULES), \
+      --patch-module $m=$(BUILDTOOLS_OUTPUTDIR)/override_modules/$m)
+  INTERIM_LANGTOOLS_ARGS = $(INTERIM_LANGTOOLS_OVERRIDE_MODULES_ARGS)
   JAVAC_MAIN_CLASS = -m jdk.compiler/com.sun.tools.javac.Main
   JAVADOC_MAIN_CLASS = -m jdk.javadoc/jdk.javadoc.internal.tool.Main
 else
-  INTERIM_OVERRIDE_MODULES_ARGS = \
+  INTERIM_LANGTOOLS_OVERRIDE_MODULES_ARGS = \
       -Xbootclasspath/p:$(call PathList, \
           $(addprefix $(BUILDTOOLS_OUTPUTDIR)/override_modules/, \
-              $(INTERIM_OVERRIDE_MODULES)))
-  INTERIM_LANGTOOLS_ARGS = $(INTERIM_OVERRIDE_MODULES_ARGS) \
+              $(INTERIM_LANGTOOLS_OVERRIDE_MODULES)))
+  INTERIM_RMIC_OVERRIDE_MODULES_ARGS = \
+      -Xbootclasspath/p:$(call PathList, \
+          $(addprefix $(BUILDTOOLS_OUTPUTDIR)/override_modules/, \
+              $(INTERIM_LANGTOOLS_OVERRIDE_MODULES) \
+              $(INTERIM_RMIC_OVERRIDE_MODULES)))
+  INTERIM_LANGTOOLS_ARGS = $(INTERIM_LANGTOOLS_OVERRIDE_MODULES_ARGS) \
       -cp $(BUILDTOOLS_OUTPUTDIR)/override_modules/jdk.compiler
   JAVAC_MAIN_CLASS = com.sun.tools.javac.Main
   JAVADOC_MAIN_CLASS = jdk.javadoc.internal.tool.Main
@@ -638,6 +648,7 @@ MKDIR:=@MKDIR@
 MV:=@MV@
 NAWK:=@NAWK@
 NICE:=@NICE@
+PANDOC:=@PANDOC@
 PATCH:=@PATCH@
 PRINTF:=@PRINTF@
 RM:=@RM@
@@ -683,8 +694,7 @@ TAR_SUPPORTS_TRANSFORM:=@TAR_SUPPORTS_TRANSFORM@
 
 # Build setup
 ENABLE_AOT:=@ENABLE_AOT@
-ENABLE_JFR=@ENABLE_JFR@
-ENABLE_INTREE_EC=@ENABLE_INTREE_EC@
+ENABLE_INTREE_EC:=@ENABLE_INTREE_EC@
 USE_EXTERNAL_LIBJPEG:=@USE_EXTERNAL_LIBJPEG@
 USE_EXTERNAL_LIBGIF:=@USE_EXTERNAL_LIBGIF@
 USE_EXTERNAL_LIBZ:=@USE_EXTERNAL_LIBZ@

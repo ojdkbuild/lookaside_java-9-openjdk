@@ -23,18 +23,20 @@
 
 /*
  * @test
- * @bug 8154283 8167320 8171098 8172809 8173117
+ * @bug 8154283 8167320 8171098 8172809 8173068 8173117 8176045
  * @summary tests for multi-module mode compilation
  * @library /tools/lib
  * @modules
  *      jdk.compiler/com.sun.tools.javac.api
  *      jdk.compiler/com.sun.tools.javac.code
  *      jdk.compiler/com.sun.tools.javac.main
+ *      jdk.compiler/com.sun.tools.javac.processing
  *      jdk.compiler/com.sun.tools.javac.util
  * @build toolbox.ToolBox toolbox.JarTask toolbox.JavacTask ModuleTestBase
  * @run main EdgeCases
  */
 
+import java.io.BufferedWriter;
 import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -53,8 +55,10 @@ import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ModuleElement;
 import javax.lang.model.element.ModuleElement.RequiresDirective;
+import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.util.ElementFilter;
+import javax.lang.model.util.Elements;
 import javax.tools.JavaCompiler;
 import javax.tools.JavaFileObject;
 import javax.tools.StandardJavaFileManager;
@@ -263,13 +267,22 @@ public class EdgeCases extends ModuleTestBase {
         Path classes = base.resolve("classes");
         tb.createDirectories(classes);
 
-        new JavacTask(tb)
+        List<String> log = new JavacTask(tb)
                 .options("--source-path", src_m1.toString(),
                          "-XDrawDiagnostics")
                 .outdir(classes)
                 .files(findJavaFiles(src_m1.resolve("test")))
                 .run(Task.Expect.FAIL)
-                .writeAll();
+                .writeAll()
+                .getOutputLines(OutputKind.DIRECT);
+
+        List<String> expected = Arrays.asList(
+                "- compiler.err.cant.access: module-info, (compiler.misc.bad.source.file.header: module-info.java, (compiler.misc.file.does.not.contain.module))",
+                "1 error");
+
+        if (!expected.equals(log)) {
+            throw new AssertionError("Unexpected output: " + log);
+        }
 
         tb.writeJavaFiles(src_m1,
                           "module m1x {}");
@@ -652,6 +665,297 @@ public class EdgeCases extends ModuleTestBase {
         if (!expected.equals(log)) {
             throw new IllegalStateException(log.toString());
         }
+    }
+
+    @Test
+    public void testUnnamedPackage(Path base) throws Exception {
+        List<String> out;
+        List<String> expected;
+
+        //-source 8:
+        Path src8 = base.resolve("src8");
+        Files.createDirectories(src8);
+        tb.writeJavaFiles(src8,
+                          "package test; public class Test {}");
+        Path classes = base.resolve("classes");
+        tb.createDirectories(classes);
+
+        out = new JavacTask(tb)
+                .options("--source-path", src8.toString(),
+                         "-processor", UnnamedPackageProcessor.class.getName(),
+                         "-source", "8")
+                .outdir(classes)
+                .files(findJavaFiles(src8))
+                .run()
+                .writeAll()
+                .getOutputLines(OutputKind.STDOUT);
+
+        expected = Arrays.asList("noModule");
+
+        if (!expected.equals(out)) {
+            throw new AssertionError("Unexpected output: " + out);
+        }
+
+        //-source 9, unnamed:
+        Path srcUnnamed = base.resolve("srcUnnamed");
+        Files.createDirectories(srcUnnamed);
+        tb.writeJavaFiles(srcUnnamed,
+                          "public class Test {}");
+        Path classesUnnamed = base.resolve("classesUnnamed");
+        tb.createDirectories(classesUnnamed);
+
+        out = new JavacTask(tb)
+                .options("--source-path", srcUnnamed.toString(),
+                         "-processor", UnnamedPackageProcessor.class.getName())
+                .outdir(classesUnnamed)
+                .files(findJavaFiles(srcUnnamed))
+                .run()
+                .writeAll()
+                .getOutputLines(OutputKind.STDOUT);
+
+        expected = Arrays.asList("unnamedModule");
+
+        if (!expected.equals(out)) {
+            throw new AssertionError("Unexpected output: " + out);
+        }
+
+        //-source 9, named:
+        Path srcNamed = base.resolve("srcNamed");
+        Files.createDirectories(srcNamed);
+        tb.writeJavaFiles(srcNamed,
+                          "module m {}",
+                          "public class Test {}");
+        Path classesNamed = base.resolve("classesNamed");
+        tb.createDirectories(classesNamed);
+
+        out = new JavacTask(tb)
+                .options("--source-path", srcNamed.toString(),
+                         "-classpath", "",
+                         "-processorpath", System.getProperty("test.class.path"),
+                         "-processor", UnnamedPackageProcessor.class.getName())
+                .outdir(classesNamed)
+                .files(findJavaFiles(srcNamed))
+                .run()
+                .writeAll()
+                .getOutputLines(OutputKind.STDOUT);
+
+        expected = Arrays.asList("m");
+
+        if (!expected.equals(out)) {
+            throw new AssertionError("Unexpected output: " + out);
+        }
+
+        //-source 9, conflict:
+        Path srcNamed2 = base.resolve("srcNamed2");
+        Path srcNamed2m1 = srcNamed2.resolve("m1x");
+        Files.createDirectories(srcNamed2m1);
+        tb.writeJavaFiles(srcNamed2m1,
+                          "module m1x {}",
+                          "public class Test {}");
+        Path srcNamed2m2 = srcNamed2.resolve("m2x");
+        Files.createDirectories(srcNamed2m2);
+        tb.writeJavaFiles(srcNamed2m2,
+                          "module m2x {}",
+                          "public class Test {}");
+        Path classesNamed2 = base.resolve("classesNamed2");
+        tb.createDirectories(classesNamed2);
+
+        out = new JavacTask(tb)
+                .options("--module-source-path", srcNamed2.toString(),
+                         "-classpath", "",
+                         "-processorpath", System.getProperty("test.class.path"),
+                         "-processor", UnnamedPackageProcessor.class.getName(),
+                         "-XDshould-stop.ifError=FLOW")
+                .outdir(classesNamed2)
+                .files(findJavaFiles(srcNamed2))
+                .run(Expect.FAIL)
+                .writeAll()
+                .getOutputLines(OutputKind.STDOUT);
+
+        expected = Arrays.asList("null",
+                                 "m1x: true",
+                                 "m2x: true");
+
+        if (!expected.equals(out)) {
+            throw new AssertionError("Unexpected output: " + out);
+        }
+    }
+
+    @SupportedAnnotationTypes("*")
+    public static final class UnnamedPackageProcessor extends AbstractProcessor {
+
+        int round = 0;
+
+        @Override
+        public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
+            if (round++ != 0)
+                return false;
+
+            Elements elements = processingEnv.getElementUtils();
+            PackageElement pe = elements.getPackageElement("");
+
+            if (pe == null) {
+                System.out.println("null");
+            } else {
+                ModuleElement mod = (ModuleElement) pe.getEnclosingElement();
+                if (mod == null) {
+                    System.out.println("noModule");
+                } else if (mod.isUnnamed()) {
+                    System.out.println("unnamedModule");
+                } else {
+                    System.out.println(mod);
+                }
+            }
+
+            ModuleElement m1x = elements.getModuleElement("m1x");
+            ModuleElement m2x = elements.getModuleElement("m2x");
+
+            if (m1x != null && m2x != null) {
+                System.out.println("m1x: " + (elements.getPackageElement(m1x, "") != null));
+                System.out.println("m2x: " + (elements.getPackageElement(m2x, "") != null));
+            }
+
+            return false;
+        }
+
+    }
+
+    @Test
+    public void testEmptyInExportedPackage(Path base) throws Exception {
+        Path src = base.resolve("src");
+        Path m = src.resolve("m");
+        tb.writeJavaFiles(m,
+                          "module m { exports api; }");
+        Path apiFile = m.resolve("api").resolve("Api.java");
+        Files.createDirectories(apiFile.getParent());
+        try (BufferedWriter w = Files.newBufferedWriter(apiFile)) {
+            w.write("//no package decl");
+        }
+        Path classes = base.resolve("classes");
+        tb.createDirectories(classes);
+
+        List<String> log;
+        List<String> expected =
+                Arrays.asList("module-info.java:1:20: compiler.err.package.empty.or.not.found: api",
+                              "1 error");
+
+        System.err.println("file explicitly specified:");
+
+        log = new JavacTask(tb)
+            .options("-XDrawDiagnostics",
+                     "--module-source-path", src.toString())
+            .outdir(classes)
+            .files(findJavaFiles(src))
+            .run(Task.Expect.FAIL)
+            .writeAll()
+            .getOutputLines(Task.OutputKind.DIRECT);
+
+        if (!expected.equals(log))
+            throw new Exception("expected output not found: " + log);
+
+        System.err.println("file not specified:");
+
+        tb.cleanDirectory(classes);
+
+        log = new JavacTask(tb)
+            .options("-XDrawDiagnostics",
+                     "--module-source-path", src.toString())
+            .outdir(classes)
+            .files(findJavaFiles(m.resolve("module-info.java")))
+            .run(Task.Expect.FAIL)
+            .writeAll()
+            .getOutputLines(Task.OutputKind.DIRECT);
+
+        if (!expected.equals(log))
+            throw new Exception("expected output not found: " + log);
+    }
+
+    @Test
+    public void testJustPackageInExportedPackage(Path base) throws Exception {
+        Path src = base.resolve("src");
+        Path m = src.resolve("m");
+        tb.writeJavaFiles(m,
+                          "module m { exports api; }");
+        Path apiFile = m.resolve("api").resolve("Api.java");
+        Files.createDirectories(apiFile.getParent());
+        try (BufferedWriter w = Files.newBufferedWriter(apiFile)) {
+            w.write("package api;");
+        }
+        Path classes = base.resolve("classes");
+        tb.createDirectories(classes);
+
+        System.err.println("file explicitly specified:");
+
+        new JavacTask(tb)
+            .options("-XDrawDiagnostics",
+                     "--module-source-path", src.toString())
+            .outdir(classes)
+            .files(findJavaFiles(src))
+            .run()
+            .writeAll();
+
+        System.err.println("file not specified:");
+
+        tb.cleanDirectory(classes);
+
+        new JavacTask(tb)
+            .options("-XDrawDiagnostics",
+                     "--module-source-path", src.toString())
+            .outdir(classes)
+            .files(findJavaFiles(m.resolve("module-info.java")))
+            .run()
+            .writeAll();
+    }
+
+    @Test
+    public void testWrongPackageInExportedPackage(Path base) throws Exception {
+        Path src = base.resolve("src");
+        Path m = src.resolve("m");
+        tb.writeJavaFiles(m,
+                          "module m { exports api; }");
+        Path apiFile = m.resolve("api").resolve("Api.java");
+        Files.createDirectories(apiFile.getParent());
+        try (BufferedWriter w = Files.newBufferedWriter(apiFile)) {
+            w.write("package impl; public class Api { }");
+        }
+        Path classes = base.resolve("classes");
+        tb.createDirectories(classes);
+
+        List<String> log;
+
+        List<String> expected =
+                Arrays.asList("module-info.java:1:20: compiler.err.package.empty.or.not.found: api",
+                              "1 error");
+
+        System.err.println("file explicitly specified:");
+
+        log = new JavacTask(tb)
+                .options("-XDrawDiagnostics",
+                         "--module-source-path", src.toString())
+                .outdir(classes)
+                .files(findJavaFiles(src))
+                .run(Task.Expect.FAIL)
+                .writeAll()
+                .getOutputLines(Task.OutputKind.DIRECT);
+
+        if (!expected.equals(log))
+            throw new Exception("expected output not found: " + log);
+
+        System.err.println("file not specified:");
+
+        tb.cleanDirectory(classes);
+
+        log = new JavacTask(tb)
+                .options("-XDrawDiagnostics",
+                         "--module-source-path", src.toString())
+                .outdir(classes)
+                .files(findJavaFiles(m.resolve("module-info.java")))
+                .run(Task.Expect.FAIL)
+                .writeAll()
+                .getOutputLines(Task.OutputKind.DIRECT);
+
+        if (!expected.equals(log))
+            throw new Exception("expected output not found: " + log);
     }
 
 }

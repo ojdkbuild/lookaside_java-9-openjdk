@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2016, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2017, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -80,15 +80,6 @@ class java_lang_String : AllStatic {
   static Handle create_from_symbol(Symbol* symbol, TRAPS);
   static Handle create_from_platform_dependent_str(const char* str, TRAPS);
   static Handle char_converter(Handle java_string, jchar from_char, jchar to_char, TRAPS);
-
-  static bool has_hash_field()  {
-    assert(initialized, "Must be initialized");
-    return (hash_offset > 0);
-  }
-  static bool has_coder_field()  {
-    assert(initialized, "Must be initialized");
-    return (coder_offset > 0);
-  }
 
   static void set_compact_strings(bool value);
 
@@ -1095,6 +1086,8 @@ class java_lang_invoke_MemberName: AllStatic {
   static int flags_offset_in_bytes()            { return _flags_offset; }
   static int vmtarget_offset_in_bytes()         { return _vmtarget_offset; }
   static int vmindex_offset_in_bytes()          { return _vmindex_offset; }
+
+  static bool equals(oop mt1, oop mt2);
 };
 
 
@@ -1389,11 +1382,13 @@ class java_lang_LiveStackFrameInfo: AllStatic {
   static int _monitors_offset;
   static int _locals_offset;
   static int _operands_offset;
+  static int _mode_offset;
 
  public:
   static void set_monitors(oop info, oop value);
   static void set_locals(oop info, oop value);
   static void set_operands(oop info, oop value);
+  static void set_mode(oop info, int value);
 
   static void compute_offsets();
 
