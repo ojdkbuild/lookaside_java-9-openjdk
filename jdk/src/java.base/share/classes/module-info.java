@@ -25,6 +25,8 @@
 
 /**
  * Defines the foundational APIs of the Java SE Platform.
+ *
+ * @since 9
  */
 module java.base {
 
@@ -134,7 +136,7 @@ module java.base {
         jdk.jartool,
         jdk.jlink,
         jdk.scripting.nashorn,
-        jdk.vm.ci;
+        jdk.internal.vm.ci;
     exports jdk.internal.org.objectweb.asm.tree to
         jdk.jlink;
     exports jdk.internal.org.objectweb.asm.util to
@@ -150,11 +152,10 @@ module java.base {
         java.desktop;
     exports jdk.internal.module to
         java.instrument,
-        java.management,
+        java.management.rmi,
         jdk.jartool,
         jdk.jlink;
     exports jdk.internal.misc to
-        java.corba,
         java.desktop,
         jdk.incubator.httpclient,
         java.logging,
@@ -174,16 +175,16 @@ module java.base {
         jdk.scripting.nashorn,
         jdk.scripting.nashorn.shell,
         jdk.unsupported,
-        jdk.vm.ci;
+        jdk.internal.vm.ci;
     exports jdk.internal.perf to
         java.desktop,
         java.management,
-        jdk.jvmstat;
+        jdk.management.agent,
+        jdk.internal.jvmstat;
     exports jdk.internal.ref to
         java.desktop,
         jdk.unsupported;
     exports jdk.internal.reflect to
-        java.corba,
         java.logging,
         java.sql,
         java.sql.rowset,
@@ -192,14 +193,14 @@ module java.base {
         jdk.unsupported;
     exports jdk.internal.vm.annotation to
         jdk.unsupported,
-        jdk.vm.ci;
+        jdk.internal.vm.ci;
     exports jdk.internal.util.jar to
         jdk.jartool,
         jdk.jdeps,
         jdk.jlink;
     exports jdk.internal.vm to
-        java.management,
-        jdk.jvmstat;
+        jdk.management.agent,
+        jdk.internal.jvmstat;
     exports sun.net to
         jdk.incubator.httpclient;
     exports sun.net.ext to
@@ -232,14 +233,13 @@ module java.base {
     exports sun.reflect.generics.reflectiveObjects to
         java.desktop;
     exports sun.reflect.misc to
-        java.corba,
         java.desktop,
         java.datatransfer,
         java.management,
+        java.management.rmi,
         java.rmi,
         java.sql.rowset,
-        java.xml,
-        java.xml.ws;
+        java.xml;
     exports sun.security.action to
         java.desktop,
         java.security.jgss;

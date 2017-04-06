@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008, 2016, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2008, 2017, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -551,6 +551,8 @@ OopMapSet* Runtime1::generate_code_for(StubID id, StubAssembler* sasm) {
         const Register r_index_1    = R1;
         const Register r_buffer_2   = R2;
 
+        Address queue_active(Rthread, in_bytes(JavaThread::satb_mark_queue_offset() +
+                                               SATBMarkQueue::byte_offset_of_active()));
         Address queue_index(Rthread, in_bytes(JavaThread::satb_mark_queue_offset() +
                                               SATBMarkQueue::byte_offset_of_index()));
         Address buffer(Rthread, in_bytes(JavaThread::satb_mark_queue_offset() +
@@ -558,6 +560,11 @@ OopMapSet* Runtime1::generate_code_for(StubID id, StubAssembler* sasm) {
 
         Label done;
         Label runtime;
+
+        // Is marking still active?
+        assert(in_bytes(SATBMarkQueue::byte_width_of_active()) == 1, "Assumption");
+        __ ldrb(R1, queue_active);
+        __ cbz(R1, done);
 
         __ ldr(r_index_1, queue_index);
         __ ldr(r_pre_val_0, Address(SP, nb_saved_regs*wordSize));
@@ -611,7 +618,7 @@ OopMapSet* Runtime1::generate_code_for(StubID id, StubAssembler* sasm) {
         Address buffer(Rthread, in_bytes(JavaThread::dirty_card_queue_offset() +
                                          DirtyCardQueue::byte_offset_of_buf()));
 
-        AddressLiteral cardtable((address)ct->byte_map_base);
+        AddressLiteral cardtable((address)ct->byte_map_base, relocInfo::none);
         assert(sizeof(*ct->byte_map_base) == sizeof(jbyte), "adjust this code");
 
         // save at least the registers that need saving if the runtime is called
@@ -638,7 +645,7 @@ OopMapSet* Runtime1::generate_code_for(StubID id, StubAssembler* sasm) {
         // Note: there is a comment in x86 code about not using
         // ExternalAddress / lea, due to relocation not working
         // properly for that address. Should be OK for arm, where we
-        // explicitly specify that 'cartable' has a relocInfo::none
+        // explicitly specify that 'cardtable' has a relocInfo::none
         // type.
         __ lea(r_card_base_1, cardtable);
         __ add(r_card_addr_0, r_card_base_1, AsmOperand(r_obj_0, lsr, CardTableModRefBS::card_shift));

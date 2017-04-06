@@ -401,6 +401,8 @@ var getJibProfilesCommon = function (input, data) {
     common.boot_jdk_home = input.get("boot_jdk", "home_path") + "/jdk"
         + common.boot_jdk_subdirpart
         + (input.build_os == "macosx" ? ".jdk/Contents/Home" : "");
+    common.boot_jdk_platform = input.build_os + "-"
+        + (input.build_cpu == "x86" ? "i586" : input.build_cpu);
 
     return common;
 };
@@ -609,6 +611,19 @@ var getJibProfilesProfiles = function (input, common, data) {
         }
     }
     profiles = concatObjects(profiles, testOnlyProfilesPrebuilt);
+
+    // On macosx add the devkit bin dir to the path in all the run-test profiles.
+    // This gives us a guaranteed working version of lldb for the jtreg failure handler.
+    if (input.build_os == "macosx") {
+        macosxRunTestExtra = {
+            dependencies: [ "devkit" ],
+            environment_path: input.get("devkit", "install_path")
+                + "/Xcode.app/Contents/Developer/usr/bin"
+        }
+        profiles["run-test"] = concatObjects(profiles["run-test"], macosxRunTestExtra);
+        profiles["run-test-jprt"] = concatObjects(profiles["run-test-jprt"], macosxRunTestExtra);
+        profiles["run-test-prebuilt"] = concatObjects(profiles["run-test-prebuilt"], macosxRunTestExtra);
+    }
 
     //
     // Define artifacts for profiles
@@ -819,9 +834,6 @@ var getJibProfilesProfiles = function (input, common, data) {
  */
 var getJibProfilesDependencies = function (input, common) {
 
-    var boot_jdk_platform = input.build_os + "-"
-        + (input.build_cpu == "x86" ? "i586" : input.build_cpu);
-
     var devkit_platform_revisions = {
         linux_x64: "gcc4.9.2-OEL6.4+1.1",
         macosx_x64: "Xcode6.3-MacOSX10.9+1.0",
@@ -840,11 +852,11 @@ var getJibProfilesDependencies = function (input, common) {
             server: "javare",
             module: "jdk",
             revision: common.boot_jdk_revision,
-            checksum_file: boot_jdk_platform + "/MD5_VALUES",
-            file: boot_jdk_platform + "/jdk-" + common.boot_jdk_revision
-                + "-" + boot_jdk_platform + ".tar.gz",
+            checksum_file: common.boot_jdk_platform + "/MD5_VALUES",
+            file: common.boot_jdk_platform + "/jdk-" + common.boot_jdk_revision
+                + "-" + common.boot_jdk_platform + ".tar.gz",
             configure_args: "--with-boot-jdk=" + common.boot_jdk_home,
-            environment_path: common.boot_jdk_home
+            environment_path: common.boot_jdk_home + "/bin"
         },
 
         devkit: {

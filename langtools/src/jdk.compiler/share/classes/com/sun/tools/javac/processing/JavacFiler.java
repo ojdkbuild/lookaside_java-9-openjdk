@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005, 2016, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2005, 2017, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -51,13 +51,17 @@ import static javax.tools.StandardLocation.SOURCE_OUTPUT;
 import static javax.tools.StandardLocation.CLASS_OUTPUT;
 
 import com.sun.tools.javac.code.Lint;
+import com.sun.tools.javac.code.Symbol.ClassSymbol;
 import com.sun.tools.javac.code.Symbol.ModuleSymbol;
 import com.sun.tools.javac.code.Symtab;
 import com.sun.tools.javac.comp.Modules;
+import com.sun.tools.javac.model.JavacElements;
 import com.sun.tools.javac.util.*;
 import com.sun.tools.javac.util.DefinedBy.Api;
 
 import static com.sun.tools.javac.code.Lint.LintCategory.PROCESSING;
+import com.sun.tools.javac.code.Symbol.PackageSymbol;
+import com.sun.tools.javac.main.Option;
 
 /**
  * The FilerImplementation class must maintain a number of
@@ -321,6 +325,7 @@ public class JavacFiler implements Filer, Closeable {
     }
 
     JavaFileManager fileManager;
+    JavacElements elementUtils;
     Log log;
     Modules modules;
     Names names;
@@ -329,6 +334,12 @@ public class JavacFiler implements Filer, Closeable {
     boolean lastRound;
 
     private final boolean lint;
+
+    /**
+     * Initial inputs passed to the tool.  This set must be
+     * synchronized.
+     */
+    private final Set<FileObject> initialInputs;
 
     /**
      * Logical names of all created files.  This set must be
@@ -373,28 +384,38 @@ public class JavacFiler implements Filer, Closeable {
      */
     private final Set<Pair<ModuleSymbol, String>> aggregateGeneratedClassNames;
 
+    private final Set<String> initialClassNames;
+
+    private final String defaultTargetModule;
 
     JavacFiler(Context context) {
         this.context = context;
         fileManager = context.get(JavaFileManager.class);
+        elementUtils = JavacElements.instance(context);
 
         log = Log.instance(context);
         modules = Modules.instance(context);
         names = Names.instance(context);
         syms = Symtab.instance(context);
 
-        fileObjectHistory = synchronizedSet(new LinkedHashSet<FileObject>());
-        generatedSourceNames = synchronizedSet(new LinkedHashSet<String>());
-        generatedSourceFileObjects = synchronizedSet(new LinkedHashSet<JavaFileObject>());
+        initialInputs = synchronizedSet(new LinkedHashSet<>());
+        fileObjectHistory = synchronizedSet(new LinkedHashSet<>());
+        generatedSourceNames = synchronizedSet(new LinkedHashSet<>());
+        generatedSourceFileObjects = synchronizedSet(new LinkedHashSet<>());
 
         generatedClasses = synchronizedMap(new LinkedHashMap<>());
 
-        openTypeNames  = synchronizedSet(new LinkedHashSet<String>());
+        openTypeNames  = synchronizedSet(new LinkedHashSet<>());
 
         aggregateGeneratedSourceNames = new LinkedHashSet<>();
         aggregateGeneratedClassNames  = new LinkedHashSet<>();
+        initialClassNames  = new LinkedHashSet<>();
 
         lint = (Lint.instance(context)).isEnabled(PROCESSING);
+
+        Options options = Options.instance(context);
+
+        defaultTargetModule = options.get(Option.DEFAULT_MODULE_FOR_CREATED_FILES);
     }
 
     @Override @DefinedBy(Api.ANNOTATION_PROCESSING)
@@ -414,29 +435,42 @@ public class JavacFiler implements Filer, Closeable {
     private Pair<ModuleSymbol, String> checkOrInferModule(CharSequence moduleAndPkg) throws FilerException {
         String moduleAndPkgString = moduleAndPkg.toString();
         int slash = moduleAndPkgString.indexOf('/');
+        String module;
+        String pkg;
 
-        if (slash != (-1)) {
-            //module name specified:
-            String module = moduleAndPkgString.substring(0, slash);
+        if (slash == (-1)) {
+            //module name not specified:
+            int lastDot = moduleAndPkgString.lastIndexOf('.');
+            String pack = lastDot != (-1) ? moduleAndPkgString.substring(0, lastDot) : "";
+            ModuleSymbol msym = inferModule(pack);
 
-            ModuleSymbol explicitModule = syms.getModule(names.fromString(module));
-
-            if (explicitModule == null) {
-                throw new FilerException("Module: " + module + " does not exist.");
+            if (msym != null) {
+                return Pair.of(msym, moduleAndPkgString);
             }
 
-            if (!modules.isRootModule(explicitModule)) {
-                throw new FilerException("Cannot write to the given module!");
+            if (defaultTargetModule == null) {
+                throw new FilerException("Cannot determine target module.");
             }
 
-            return Pair.of(explicitModule, moduleAndPkgString.substring(slash + 1));
+            module = defaultTargetModule;
+            pkg = moduleAndPkgString;
         } else {
-            if (modules.multiModuleMode) {
-                throw new FilerException("No module to write to specified!");
-            }
-
-            return Pair.of(modules.getDefaultModule(), moduleAndPkgString);
+            //module name specified:
+            module = moduleAndPkgString.substring(0, slash);
+            pkg = moduleAndPkgString.substring(slash + 1);
         }
+
+        ModuleSymbol explicitModule = syms.getModule(names.fromString(module));
+
+        if (explicitModule == null) {
+            throw new FilerException("Module: " + module + " does not exist.");
+        }
+
+        if (!modules.isRootModule(explicitModule)) {
+            throw new FilerException("Cannot write to the given module.");
+        }
+
+        return Pair.of(explicitModule, pkg);
     }
 
     private JavaFileObject createSourceOrClassFile(ModuleSymbol mod, boolean isSourceFile, String name) throws IOException {
@@ -482,16 +516,12 @@ public class JavacFiler implements Filer, Closeable {
                                      CharSequence moduleAndPkg,
                                      CharSequence relativeName,
                                      Element... originatingElements) throws IOException {
-        Pair<ModuleSymbol, String> moduleAndPackage = checkOrInferModule(moduleAndPkg);
-        ModuleSymbol msym = moduleAndPackage.fst;
-        String pkg = moduleAndPackage.snd;
+        Tuple3<Location, ModuleSymbol, String> locationModuleAndPackage = checkOrInferModule(location, moduleAndPkg, true);
+        location = locationModuleAndPackage.a;
+        ModuleSymbol msym = locationModuleAndPackage.b;
+        String pkg = locationModuleAndPackage.c;
 
         locationCheck(location);
-
-        if (modules.multiModuleMode) {
-            Assert.checkNonNull(msym);
-            location = this.fileManager.getLocationForModule(location, msym.name.toString());
-        }
 
         String strPkg = pkg.toString();
         if (strPkg.length() > 0)
@@ -521,14 +551,9 @@ public class JavacFiler implements Filer, Closeable {
     public FileObject getResource(JavaFileManager.Location location,
                                   CharSequence moduleAndPkg,
                                   CharSequence relativeName) throws IOException {
-        Pair<ModuleSymbol, String> moduleAndPackage = checkOrInferModule(moduleAndPkg);
-        ModuleSymbol msym = moduleAndPackage.fst;
-        String pkg = moduleAndPackage.snd;
-
-        if (modules.multiModuleMode) {
-            Assert.checkNonNull(msym);
-            location = this.fileManager.getLocationForModule(location, msym.name.toString());
-        }
+        Tuple3<Location, ModuleSymbol, String> locationModuleAndPackage = checkOrInferModule(location, moduleAndPkg, false);
+        location = locationModuleAndPackage.a;
+        String pkg = locationModuleAndPackage.c;
 
         if (pkg.length() > 0)
             checkName(pkg);
@@ -565,6 +590,99 @@ public class JavacFiler implements Filer, Closeable {
         return new FilerInputFileObject(fileObject);
     }
 
+    private Tuple3<JavaFileManager.Location, ModuleSymbol, String> checkOrInferModule(JavaFileManager.Location location,
+                                                           CharSequence moduleAndPkg,
+                                                           boolean write) throws IOException {
+        String moduleAndPkgString = moduleAndPkg.toString();
+        int slash = moduleAndPkgString.indexOf('/');
+        boolean multiModuleLocation = location.isModuleOrientedLocation() ||
+                                      (modules.multiModuleMode && location.isOutputLocation());
+        String module;
+        String pkg;
+
+        if (slash == (-1)) {
+            //module name not specified:
+            if (!multiModuleLocation) {
+                //package oriented location:
+                return new Tuple3<>(location, modules.getDefaultModule(), moduleAndPkgString);
+            }
+
+            if (location.isOutputLocation()) {
+                ModuleSymbol msym = inferModule(moduleAndPkgString);
+
+                if (msym != null) {
+                    Location moduleLoc =
+                            fileManager.getLocationForModule(location, msym.name.toString());
+                    return new Tuple3<>(moduleLoc, msym, moduleAndPkgString);
+                }
+            }
+
+            if (defaultTargetModule == null) {
+                throw new FilerException("No module specified and the location is either " +
+                                         "a module-oriented location, or a multi-module " +
+                                         "output location.");
+            }
+
+            module = defaultTargetModule;
+            pkg = moduleAndPkgString;
+        } else {
+            //module name specified:
+            module = moduleAndPkgString.substring(0, slash);
+            pkg = moduleAndPkgString.substring(slash + 1);
+        }
+
+        if (multiModuleLocation) {
+            ModuleSymbol explicitModule = syms.getModule(names.fromString(module));
+
+            if (explicitModule == null) {
+                throw new FilerException("Module: " + module + " does not exist.");
+            }
+
+            if (write && !modules.isRootModule(explicitModule)) {
+                throw new FilerException("Cannot write to the given module.");
+            }
+
+            Location moduleLoc = fileManager.getLocationForModule(location, module);
+
+            return new Tuple3<>(moduleLoc, explicitModule, pkg);
+        } else {
+            throw new FilerException("Module specified but the location is neither " +
+                                     "a module-oriented location, nor a multi-module " +
+                                     "output location.");
+        }
+    }
+
+    static final class Tuple3<A, B, C> {
+        final A a;
+        final B b;
+        final C c;
+
+        public Tuple3(A a, B b, C c) {
+            this.a = a;
+            this.b = b;
+            this.c = c;
+        }
+    }
+
+    private ModuleSymbol inferModule(String pkg) {
+        if (modules.getDefaultModule() == syms.noModule)
+            return modules.getDefaultModule();
+
+        Set<ModuleSymbol> rootModules = modules.getRootModules();
+
+        if (rootModules.size() == 1) {
+            return rootModules.iterator().next();
+        }
+
+        PackageSymbol pack = elementUtils.getPackageElement(pkg);
+
+        if (pack != null && pack.modle != syms.unnamedModule) {
+            return pack.modle;
+        }
+
+        return null;
+    }
+
     private void checkName(String name) throws FilerException {
         checkName(name, false);
     }
@@ -596,8 +714,13 @@ public class JavacFiler implements Filer, Closeable {
         // TODO: Check if type already exists on source or class path?
         // If so, use warning message key proc.type.already.exists
         checkName(typename, allowUnnamedPackageInfo);
-        if (aggregateGeneratedSourceNames.contains(Pair.of(mod, typename)) ||
-            aggregateGeneratedClassNames.contains(Pair.of(mod, typename))) {
+        ClassSymbol existing;
+        boolean alreadySeen = aggregateGeneratedSourceNames.contains(Pair.of(mod, typename)) ||
+                              aggregateGeneratedClassNames.contains(Pair.of(mod, typename)) ||
+                              initialClassNames.contains(typename) ||
+                              ((existing = elementUtils.getTypeElement(typename)) != null &&
+                               initialInputs.contains(existing.sourcefile));
+        if (alreadySeen) {
             if (lint)
                 log.warning("proc.type.recreate", typename);
             throw new FilerException("Attempt to recreate a file for type " + typename);
@@ -611,16 +734,48 @@ public class JavacFiler implements Filer, Closeable {
      * Check to see if the file has already been opened; if so, throw
      * an exception, otherwise add it to the set of files.
      */
-    private void checkFileReopening(FileObject fileObject, boolean addToHistory) throws FilerException {
-        for(FileObject veteran : fileObjectHistory) {
-            if (fileManager.isSameFile(veteran, fileObject)) {
-                if (lint)
-                    log.warning("proc.file.reopening", fileObject.getName());
-                throw new FilerException("Attempt to reopen a file for path " + fileObject.getName());
+    private void checkFileReopening(FileObject fileObject, boolean forWriting) throws FilerException {
+        if (isInFileObjectHistory(fileObject, forWriting)) {
+            if (lint)
+                log.warning("proc.file.reopening", fileObject.getName());
+            throw new FilerException("Attempt to reopen a file for path " + fileObject.getName());
+        }
+        if (forWriting)
+            fileObjectHistory.add(fileObject);
+    }
+
+    private boolean isInFileObjectHistory(FileObject fileObject, boolean forWriting) {
+        if (forWriting) {
+            for(FileObject veteran : initialInputs) {
+                try {
+                    if (fileManager.isSameFile(veteran, fileObject)) {
+                        return true;
+                    }
+                } catch (IllegalArgumentException e) {
+                    //ignore...
+                }
+            }
+            for (String className : initialClassNames) {
+                try {
+                    ClassSymbol existing = elementUtils.getTypeElement(className);
+                    if (   existing != null
+                        && (   (existing.sourcefile != null && fileManager.isSameFile(existing.sourcefile, fileObject))
+                            || (existing.classfile != null && fileManager.isSameFile(existing.classfile, fileObject)))) {
+                        return true;
+                    }
+                } catch (IllegalArgumentException e) {
+                    //ignore...
+                }
             }
         }
-        if (addToHistory)
-            fileObjectHistory.add(fileObject);
+
+        for(FileObject veteran : fileObjectHistory) {
+            if (fileManager.isSameFile(veteran, fileObject)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public boolean newFiles() {
@@ -656,9 +811,17 @@ public class JavacFiler implements Filer, Closeable {
         this.lastRound = lastRound;
     }
 
+    public void setInitialState(Collection<? extends JavaFileObject> initialInputs,
+                                Collection<String> initialClassNames) {
+        this.initialInputs.addAll(initialInputs);
+        this.initialClassNames.addAll(initialClassNames);
+    }
+
     public void close() {
         clearRoundState();
         // Cross-round state
+        initialClassNames.clear();
+        initialInputs.clear();
         fileObjectHistory.clear();
         openTypeNames.clear();
         aggregateGeneratedSourceNames.clear();

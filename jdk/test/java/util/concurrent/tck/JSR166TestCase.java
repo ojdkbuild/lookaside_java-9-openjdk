@@ -46,6 +46,7 @@
  * @summary JSR-166 tck tests (whitebox tests allowed)
  * @build *
  * @modules java.base/java.util.concurrent:open
+ *          java.base/java.lang:open
  *          java.management
  * @run junit/othervm/timeout=1000
  *      -Djsr166.testImplementationDetails=true
@@ -58,6 +59,9 @@
  *      -Djsr166.testImplementationDetails=true
  *      -Djava.util.concurrent.ForkJoinPool.common.parallelism=1
  *      -Djava.util.secureRandomSeed=true
+ *      JSR166TestCase
+ * @run junit/othervm/timeout=1000/policy=tck.policy
+ *      -Djsr166.testImplementationDetails=true
  *      JSR166TestCase
  */
 
@@ -584,6 +588,7 @@ public class JSR166TestCase extends TestCase {
                 "AtomicReference9Test",
                 "AtomicReferenceArray9Test",
                 "ExecutorCompletionService9Test",
+                "ForkJoinPool9Test",
             };
             addNamedTestClasses(suite, java9TestClassNames);
         }
@@ -594,7 +599,7 @@ public class JSR166TestCase extends TestCase {
     /** Returns list of junit-style test method names in given class. */
     public static ArrayList<String> testMethodNames(Class<?> testClass) {
         Method[] methods = testClass.getDeclaredMethods();
-        ArrayList<String> names = new ArrayList<String>(methods.length);
+        ArrayList<String> names = new ArrayList<>(methods.length);
         for (Method method : methods) {
             if (method.getName().startsWith("test")
                 && Modifier.isPublic(method.getModifiers())
@@ -700,7 +705,7 @@ public class JSR166TestCase extends TestCase {
      * The first exception encountered if any threadAssertXXX method fails.
      */
     private final AtomicReference<Throwable> threadFailure
-        = new AtomicReference<Throwable>(null);
+        = new AtomicReference<>(null);
 
     /**
      * Records an exception so that it can be rethrown later in the test
@@ -1262,7 +1267,7 @@ public class JSR166TestCase extends TestCase {
         }
         public void refresh() {}
         public String toString() {
-            List<Permission> ps = new ArrayList<Permission>();
+            List<Permission> ps = new ArrayList<>();
             for (Enumeration<Permission> e = perms.elements(); e.hasMoreElements();)
                 ps.add(e.nextElement());
             return "AdjustablePolicy with permissions " + ps;
@@ -1321,18 +1326,58 @@ public class JSR166TestCase extends TestCase {
                 startTime = System.nanoTime();
             else if (millisElapsedSince(startTime) > timeoutMillis) {
                 threadAssertTrue(thread.isAlive());
-                return;
+                fail("timed out waiting for thread to enter wait state");
             }
             Thread.yield();
         }
     }
 
     /**
-     * Waits up to LONG_DELAY_MS for the given thread to enter a wait
-     * state: BLOCKED, WAITING, or TIMED_WAITING.
+     * Spin-waits up to the specified number of milliseconds for the given
+     * thread to enter a wait state: BLOCKED, WAITING, or TIMED_WAITING,
+     * and additionally satisfy the given condition.
+     */
+    void waitForThreadToEnterWaitState(
+        Thread thread, long timeoutMillis, Callable<Boolean> waitingForGodot) {
+        long startTime = 0L;
+        for (;;) {
+            Thread.State s = thread.getState();
+            if (s == Thread.State.BLOCKED ||
+                s == Thread.State.WAITING ||
+                s == Thread.State.TIMED_WAITING) {
+                try {
+                    if (waitingForGodot.call())
+                        return;
+                } catch (Throwable fail) { threadUnexpectedException(fail); }
+            }
+            else if (s == Thread.State.TERMINATED)
+                fail("Unexpected thread termination");
+            else if (startTime == 0L)
+                startTime = System.nanoTime();
+            else if (millisElapsedSince(startTime) > timeoutMillis) {
+                threadAssertTrue(thread.isAlive());
+                fail("timed out waiting for thread to enter wait state");
+            }
+            Thread.yield();
+        }
+    }
+
+    /**
+     * Spin-waits up to LONG_DELAY_MS milliseconds for the given thread to
+     * enter a wait state: BLOCKED, WAITING, or TIMED_WAITING.
      */
     void waitForThreadToEnterWaitState(Thread thread) {
         waitForThreadToEnterWaitState(thread, LONG_DELAY_MS);
+    }
+
+    /**
+     * Spin-waits up to LONG_DELAY_MS milliseconds for the given thread to
+     * enter a wait state: BLOCKED, WAITING, or TIMED_WAITING,
+     * and additionally satisfy the given condition.
+     */
+    void waitForThreadToEnterWaitState(
+        Thread thread, Callable<Boolean> waitingForGodot) {
+        waitForThreadToEnterWaitState(thread, LONG_DELAY_MS, waitingForGodot);
     }
 
     /**

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2016, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2017, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -684,7 +684,7 @@ JVM_ENTRY(jobject, JVM_Clone(JNIEnv* env, jobject handle))
       // This can safepoint and redefine method, so need both new_obj and method
       // in a handle, for two different reasons.  new_obj can move, method can be
       // deleted if nothing is using it on the stack.
-      m->method_holder()->add_member_name(new_obj());
+      m->method_holder()->add_member_name(new_obj(), false);
     }
   }
 
@@ -1009,9 +1009,9 @@ JVM_END
 // Module support //////////////////////////////////////////////////////////////////////////////
 
 JVM_ENTRY(void, JVM_DefineModule(JNIEnv *env, jobject module, jboolean is_open, jstring version,
-                                 jstring location, jobjectArray packages))
+                                 jstring location, const char* const* packages, jsize num_packages))
   JVMWrapper("JVM_DefineModule");
-  Modules::define_module(module, version, location, packages, CHECK);
+  Modules::define_module(module, version, location, packages, num_packages, CHECK);
 JVM_END
 
 JVM_ENTRY(void, JVM_SetBootLoaderUnnamedModule(JNIEnv *env, jobject module))
@@ -1019,17 +1019,17 @@ JVM_ENTRY(void, JVM_SetBootLoaderUnnamedModule(JNIEnv *env, jobject module))
   Modules::set_bootloader_unnamed_module(module, CHECK);
 JVM_END
 
-JVM_ENTRY(void, JVM_AddModuleExports(JNIEnv *env, jobject from_module, jstring package, jobject to_module))
+JVM_ENTRY(void, JVM_AddModuleExports(JNIEnv *env, jobject from_module, const char* package, jobject to_module))
   JVMWrapper("JVM_AddModuleExports");
   Modules::add_module_exports_qualified(from_module, package, to_module, CHECK);
 JVM_END
 
-JVM_ENTRY(void, JVM_AddModuleExportsToAllUnnamed(JNIEnv *env, jobject from_module, jstring package))
+JVM_ENTRY(void, JVM_AddModuleExportsToAllUnnamed(JNIEnv *env, jobject from_module, const char* package))
   JVMWrapper("JVM_AddModuleExportsToAllUnnamed");
   Modules::add_module_exports_to_all_unnamed(from_module, package, CHECK);
 JVM_END
 
-JVM_ENTRY(void, JVM_AddModuleExportsToAll(JNIEnv *env, jobject from_module, jstring package))
+JVM_ENTRY(void, JVM_AddModuleExportsToAll(JNIEnv *env, jobject from_module, const char* package))
   JVMWrapper("JVM_AddModuleExportsToAll");
   Modules::add_module_exports(from_module, package, NULL, CHECK);
 JVM_END
@@ -1039,14 +1039,9 @@ JVM_ENTRY (void, JVM_AddReadsModule(JNIEnv *env, jobject from_module, jobject so
   Modules::add_reads_module(from_module, source_module, CHECK);
 JVM_END
 
-JVM_ENTRY (void, JVM_AddModulePackage(JNIEnv *env, jobject module, jstring package))
+JVM_ENTRY (void, JVM_AddModulePackage(JNIEnv *env, jobject module, const char* package))
   JVMWrapper("JVM_AddModulePackage");
   Modules::add_module_package(module, package, CHECK);
-JVM_END
-
-JVM_ENTRY (jobject, JVM_GetModuleByPackageName(JNIEnv *env, jobject loader, jstring package))
-  JVMWrapper("JVM_GetModuleByPackageName");
-  return Modules::get_module_by_package_name(loader, package, THREAD);
 JVM_END
 
 // Reflection support //////////////////////////////////////////////////////////////////////////////

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2016, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2017, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -2139,8 +2139,6 @@ void InstanceKlass::release_C_heap_structures(InstanceKlass* ik) {
 }
 
 void InstanceKlass::release_C_heap_structures() {
-  assert(!this->is_shared(), "should not be called for a shared class");
-
   // Can't release the constant pool here because the constant pool can be
   // deallocated separately from the InstanceKlass for default methods and
   // redefine classes.
@@ -2191,7 +2189,7 @@ void InstanceKlass::release_C_heap_structures() {
   }
 
   // deallocate the cached class file
-  if (_cached_class_file != NULL) {
+  if (_cached_class_file != NULL && !MetaspaceShared::is_in_shared_space(_cached_class_file)) {
     os::free(_cached_class_file);
     _cached_class_file = NULL;
   }
@@ -2808,7 +2806,7 @@ nmethod* InstanceKlass::lookup_osr_nmethod(const Method* m, int bci, int comp_le
   return NULL;
 }
 
-bool InstanceKlass::add_member_name(Handle mem_name) {
+oop InstanceKlass::add_member_name(Handle mem_name, bool intern) {
   jweak mem_name_wref = JNIHandles::make_weak_global(mem_name);
   MutexLocker ml(MemberNameTable_lock);
   DEBUG_ONLY(NoSafepointVerifier nsv);
@@ -2818,7 +2816,7 @@ bool InstanceKlass::add_member_name(Handle mem_name) {
   // is called!
   Method* method = (Method*)java_lang_invoke_MemberName::vmtarget(mem_name());
   if (method->is_obsolete()) {
-    return false;
+    return NULL;
   } else if (method->is_old()) {
     // Replace method with redefined version
     java_lang_invoke_MemberName::set_vmtarget(mem_name(), method_with_idnum(method->method_idnum()));
@@ -2827,8 +2825,11 @@ bool InstanceKlass::add_member_name(Handle mem_name) {
   if (_member_names == NULL) {
     _member_names = new (ResourceObj::C_HEAP, mtClass) MemberNameTable(idnum_allocated_count());
   }
-  _member_names->add_member_name(mem_name_wref);
-  return true;
+  if (intern) {
+    return _member_names->find_or_add_member_name(mem_name_wref);
+  } else {
+    return _member_names->add_member_name(mem_name_wref);
+  }
 }
 
 // -----------------------------------------------------------------------------------------------------

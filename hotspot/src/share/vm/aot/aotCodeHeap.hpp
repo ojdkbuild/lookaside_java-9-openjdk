@@ -88,7 +88,7 @@ typedef struct {
 } AOTHeader;
 
 typedef struct {
-  enum { CONFIG_SIZE = 11 + 7 * 4 };
+  enum { CONFIG_SIZE = 12 + 7 * 4 };
   int _config_size;
   int _narrowOopShift;
   int _narrowKlassShift;
@@ -108,6 +108,7 @@ typedef struct {
   bool _tieredAOT;
   bool _enableContended;
   bool _restrictContended;
+  bool _omitAssertions;
 } AOTConfiguration;
 
 class AOTLib : public CHeapObj<mtCode> {
@@ -239,6 +240,11 @@ public:
     assert(result == CodeHeap::contains(p), "");
     return result;
   }
+
+  bool contains_blob(const CodeBlob* blob) const {
+    return CodeHeap::contains(blob->code_begin());
+  }
+
   AOTCompiledMethod* find_aot(address p) const;
 
   virtual void* find_start(void* p)     const;
