@@ -1,4 +1,0 @@
-repo: b8a1b238c77c7c00024daaa2cb7d10838e017b5f
-node: 5e5e436543daea0c174d878d5e3ff8dd791e538a
-branch: default
-tag: jdk-9+163

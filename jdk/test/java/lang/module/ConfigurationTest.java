@@ -40,7 +40,6 @@ import java.lang.module.ModuleDescriptor.Requires;
 import java.lang.module.ModuleFinder;
 import java.lang.module.ResolutionException;
 import java.lang.module.ResolvedModule;
-import java.lang.reflect.Layer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -1708,7 +1707,7 @@ public class ConfigurationTest {
 
         ModuleFinder finder = ModuleUtils.finderOf(descriptor);
 
-        Configuration bootConfiguration = Layer.boot().configuration();
+        Configuration bootConfiguration = ModuleLayer.boot().configuration();
 
         // m1 contains package java.lang, java.base exports package java.lang to m1
         resolve(bootConfiguration, finder, "m1");
@@ -1844,17 +1843,9 @@ public class ConfigurationTest {
     public Object[][] createPlatformMatches() {
         return new Object[][]{
 
-            { "linux-arm",     "*-*" },
-            { "linux-*",       "*-*" },
-            { "*-arm",         "*-*" },
-
-            { "linux-*",       "linux-*" },
-            { "linux-arm",     "linux-*" },
-
-            { "*-arm",         "*-arm" },
-            { "linux-arm",     "*-arm" },
-
-            { "linux-arm",   "linux-arm" },
+            { "",              "" },
+            { "linux-arm",     "" },
+            { "linux-arm",     "linux-arm" },
 
         };
 
@@ -1864,9 +1855,8 @@ public class ConfigurationTest {
     public Object[][] createBad() {
         return new Object[][] {
 
-            { "linux-*",        "solaris-*"     },
-            { "*-arm",          "*-sparc"       },
-            { "linux-x86",      "solaris-sparc" },
+            { "linux-x64",        "linux-arm" },
+            { "linux-x64",        "windows-x64" },
 
         };
     }
@@ -1878,7 +1868,7 @@ public class ConfigurationTest {
     public void testPlatformMatch(String s1, String s2) throws IOException {
 
         ModuleDescriptor base =  ModuleDescriptor.newModule("java.base").build();
-        Path system = writeModule(base, "*-*");
+        Path system = writeModule(base, null);
 
         ModuleDescriptor descriptor1 = ModuleDescriptor.newModule("m1")
                 .requires("m2")
@@ -1929,7 +1919,7 @@ public class ConfigurationTest {
         throws IOException
     {
         ModuleDescriptor base =  ModuleDescriptor.newModule("java.base").build();
-        Path system = writeModule(base, "*-*");
+        Path system = writeModule(base, null);
 
         ModuleDescriptor descriptor1 = ModuleDescriptor.newModule("m1").build();
         Path dir1 = writeModule(descriptor1, s1);
@@ -1989,14 +1979,14 @@ public class ConfigurationTest {
 
     @Test(expectedExceptions = { NullPointerException.class })
     public void testResolveRequiresWithNull5() {
-        Configuration cf = Layer.boot().configuration();
+        Configuration cf = ModuleLayer.boot().configuration();
         Configuration.resolve(ModuleFinder.of(), List.of(cf), null, Set.of());
     }
 
     @Test(expectedExceptions = { NullPointerException.class })
     public void testResolveRequiresWithNull6() {
         ModuleFinder empty = ModuleFinder.of();
-        Configuration cf = Layer.boot().configuration();
+        Configuration cf = ModuleLayer.boot().configuration();
         Configuration.resolve(empty, List.of(cf), empty, null);
     }
 
@@ -2024,14 +2014,14 @@ public class ConfigurationTest {
 
     @Test(expectedExceptions = { NullPointerException.class })
     public void testResolveRequiresAndUsesWithNull5() {
-        Configuration cf = Layer.boot().configuration();
+        Configuration cf = ModuleLayer.boot().configuration();
         Configuration.resolveAndBind(ModuleFinder.of(), List.of(cf), null, Set.of());
     }
 
     @Test(expectedExceptions = { NullPointerException.class })
     public void testResolveRequiresAndUsesWithNull6() {
         ModuleFinder empty = ModuleFinder.of();
-        Configuration cf = Layer.boot().configuration();
+        Configuration cf = ModuleLayer.boot().configuration();
         Configuration.resolveAndBind(empty, List.of(cf), empty, null);
     }
 
@@ -2044,14 +2034,14 @@ public class ConfigurationTest {
 
     @Test(expectedExceptions = { UnsupportedOperationException.class })
     public void testImmutableSet1() {
-        Configuration cf = Layer.boot().configuration();
+        Configuration cf = ModuleLayer.boot().configuration();
         ResolvedModule base = cf.findModule("java.base").get();
         cf.modules().add(base);
     }
 
     @Test(expectedExceptions = { UnsupportedOperationException.class })
     public void testImmutableSet2() {
-        Configuration cf = Layer.boot().configuration();
+        Configuration cf = ModuleLayer.boot().configuration();
         ResolvedModule base = cf.findModule("java.base").get();
         base.reads().add(base);
     }
@@ -2114,17 +2104,18 @@ public class ConfigurationTest {
 
 
     /**
-     * Decodes the platform string and calls the builder osName/osArch/osVersion
-     * methods to set the platform constraints.
+     * Writes a module-info.class. If {@code targetPlatform} is not null then
+     * it includes the ModuleTarget class file attribute with the target platform.
      */
-    static Path writeModule(ModuleDescriptor descriptor, String platformString)
+    static Path writeModule(ModuleDescriptor descriptor, String targetPlatform)
         throws IOException
     {
-        String[] s = platformString.split("-");
-        String osName = !s[0].equals("*") ? s[0] : null;
-        String osArch = !s[1].equals("*") ? s[1] : null;
-        ModuleTarget target = new ModuleTarget(osName, osArch);
-
+        ModuleTarget target;
+        if (targetPlatform != null) {
+            target = new ModuleTarget(targetPlatform);
+        } else {
+            target = null;
+        }
         String name = descriptor.name();
         Path dir = Files.createTempDirectory(name);
         Path mi = dir.resolve("module-info.class");

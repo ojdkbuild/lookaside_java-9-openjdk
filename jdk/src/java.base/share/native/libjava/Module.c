@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2017, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -29,12 +29,12 @@
 #include "jni_util.h"
 #include "jvm.h"
 
-#include "java_lang_reflect_Module.h"
+#include "java_lang_Module.h"
 
 /*
  * Gets the UTF-8 chars for the string and translates '.' to '/'.  Does no
  * further validation, assumption being that both calling code in
- * java.lang.reflect.Module and VM will do deeper validation.
+ * java.lang.Module and VM will do deeper validation.
  */
 static char*
 GetInternalPackageName(JNIEnv *env, jstring pkg, char* buf, jsize buf_size)
@@ -68,7 +68,7 @@ GetInternalPackageName(JNIEnv *env, jstring pkg, char* buf, jsize buf_size)
 }
 
 JNIEXPORT void JNICALL
-Java_java_lang_reflect_Module_defineModule0(JNIEnv *env, jclass cls, jobject module,
+Java_java_lang_Module_defineModule0(JNIEnv *env, jclass cls, jobject module,
                                             jboolean is_open, jstring version,
                                             jstring location, jobjectArray packages)
 {
@@ -109,14 +109,14 @@ Java_java_lang_reflect_Module_defineModule0(JNIEnv *env, jclass cls, jobject mod
 }
 
 JNIEXPORT void JNICALL
-Java_java_lang_reflect_Module_addReads0(JNIEnv *env, jclass cls, jobject from, jobject to)
+Java_java_lang_Module_addReads0(JNIEnv *env, jclass cls, jobject from, jobject to)
 {
     JVM_AddReadsModule(env, from, to);
 }
 
 JNIEXPORT void JNICALL
-Java_java_lang_reflect_Module_addExports0(JNIEnv *env, jclass cls, jobject from,
-                                          jstring pkg, jobject to)
+Java_java_lang_Module_addExports0(JNIEnv *env, jclass cls, jobject from,
+                                  jstring pkg, jobject to)
 {
     char buf[128];
     char* pkg_name;
@@ -136,8 +136,8 @@ Java_java_lang_reflect_Module_addExports0(JNIEnv *env, jclass cls, jobject from,
 }
 
 JNIEXPORT void JNICALL
-Java_java_lang_reflect_Module_addExportsToAll0(JNIEnv *env, jclass cls, jobject from,
-                                               jstring pkg)
+Java_java_lang_Module_addExportsToAll0(JNIEnv *env, jclass cls, jobject from,
+                                       jstring pkg)
 {
     char buf[128];
     char* pkg_name;
@@ -157,8 +157,8 @@ Java_java_lang_reflect_Module_addExportsToAll0(JNIEnv *env, jclass cls, jobject 
 }
 
 JNIEXPORT void JNICALL
-Java_java_lang_reflect_Module_addExportsToAllUnnamed0(JNIEnv *env, jclass cls,
-                                                      jobject from, jstring pkg)
+Java_java_lang_Module_addExportsToAllUnnamed0(JNIEnv *env, jclass cls,
+                                              jobject from, jstring pkg)
 {
     char buf[128];
     char* pkg_name;
@@ -171,26 +171,6 @@ Java_java_lang_reflect_Module_addExportsToAllUnnamed0(JNIEnv *env, jclass cls,
     pkg_name = GetInternalPackageName(env, pkg, buf, (jsize)sizeof(buf));
     if (pkg_name != NULL) {
         JVM_AddModuleExportsToAllUnnamed(env, from, pkg_name);
-        if (pkg_name != buf) {
-            free(pkg_name);
-        }
-    }
-}
-
-JNIEXPORT void JNICALL
-Java_java_lang_reflect_Module_addPackage0(JNIEnv *env, jclass cls, jobject m, jstring pkg)
-{
-    char buf[128];
-    char* pkg_name;
-
-    if (pkg == NULL) {
-        JNU_ThrowNullPointerException(env, "package is null");
-        return;
-    }
-
-    pkg_name = GetInternalPackageName(env, pkg, buf, (jsize)sizeof(buf));
-    if (pkg_name != NULL) {
-        JVM_AddModulePackage(env, m, pkg_name);
         if (pkg_name != buf) {
             free(pkg_name);
         }

@@ -43,13 +43,17 @@ import java.lang.module.ModuleFinder;
  * target names, and for each provides a description of what the permission
  * allows and a discussion of the risks of granting code the permission.
  *
- * <table border=1 cellpadding=5 summary="permission target name,
- *  what the target allows,and associated risks">
+ * <table class="striped">
+ * <caption style="display:none">permission target name,
+ *  what the target allows, and associated risks</caption>
+ * <thead>
  * <tr>
  * <th>Permission Target Name</th>
  * <th>What the Permission Allows</th>
  * <th>Risks of Allowing this Permission</th>
  * </tr>
+ * </thead>
+ * <tbody>
  *
  * <tr>
  *   <td>createClassLoader</td>
@@ -336,14 +340,6 @@ import java.lang.module.ModuleFinder;
  * </tr>
  *
  * <tr>
- *   <td>usePolicy</td>
- *   <td>Granting this permission disables the Java Plug-In's default
- *   security prompting behavior.</td>
- *   <td>For more information, refer to the <a href=
- *   "../../../technotes/guides/deploy/index.html">deployment guide</a>.
- *   </td>
- * </tr>
- * <tr>
  *   <td>manageProcess</td>
  *   <td>Native process termination and information about processes
  *       {@link ProcessHandle}.</td>
@@ -383,6 +379,7 @@ import java.lang.module.ModuleFinder;
  *   {@linkplain ModuleFinder#ofSystem system modules} in the runtime image.</td>
  * </tr>
  *
+ * </tbody>
  * </table>
  *
  * @implNote
@@ -398,6 +395,7 @@ import java.lang.module.ModuleFinder;
  *
  * @author Marianne Mueller
  * @author Roland Schemers
+ * @since 1.2
  */
 
 public final class RuntimePermission extends BasicPermission {

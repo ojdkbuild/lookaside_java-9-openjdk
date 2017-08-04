@@ -48,7 +48,7 @@ import jdk.internal.module.SystemModuleFinder;
 /**
  * A finder of modules. A {@code ModuleFinder} is used to find modules during
  * <a href="package-summary.html#resolution">resolution</a> or
- * <a href="package-summary.html#servicebinding">service binding</a>.
+ * <a href="Configuration.html#service-binding">service binding</a>.
  *
  * <p> A {@code ModuleFinder} can only find one module with a given name. A
  * {@code ModuleFinder} that finds modules in a sequence of directories, for
@@ -228,42 +228,47 @@ public interface ModuleFinder {
      * directory is treated as an exploded module rather than a directory of
      * modules. </p>
      *
-     * <p> The module finder returned by this method supports modules that are
-     * packaged as JAR files. A JAR file with a {@code module-info.class} in
-     * the top-level directory of the JAR file (or overridden by a versioned
-     * entry in a {@link java.util.jar.JarFile#isMultiRelease() multi-release}
-     * JAR file) is a modular JAR and is an <em>explicit module</em>.
-     * A JAR file that does not have a {@code module-info.class} in the
-     * top-level directory is created as an automatic module. The components
-     * for the automatic module are derived as follows:
+     * <p id="automatic-modules"> The module finder returned by this method
+     * supports modules packaged as JAR files. A JAR file with a {@code
+     * module-info.class} in its top-level directory, or in a versioned entry
+     * in a {@linkplain java.util.jar.JarFile#isMultiRelease() multi-release}
+     * JAR file, is a modular JAR file and thus defines an <em>explicit</em>
+     * module. A JAR file that does not have a {@code module-info.class} in its
+     * top-level directory defines an <em>automatic module</em>, as follows:
+     * </p>
      *
      * <ul>
      *
-     *     <li><p> The module {@link ModuleDescriptor#name() name}, and {@link
-     *     ModuleDescriptor#version() version} if applicable, is derived from
-     *     the file name of the JAR file as follows: </p>
+     *     <li><p> If the JAR file has the attribute "{@code Automatic-Module-Name}"
+     *     in its main manifest then its value is the {@linkplain
+     *     ModuleDescriptor#name() module name}. The module name is otherwise
+     *     derived from the name of the JAR file. </p></li>
+     *
+     *     <li><p> The {@link ModuleDescriptor#version() version}, and the
+     *     module name when the attribute "{@code Automatic-Module-Name}" is not
+     *     present, are derived from the file name of the JAR file as follows: </p>
      *
      *     <ul>
      *
-     *         <li><p> The {@code .jar} suffix is removed. </p></li>
+     *         <li><p> The "{@code .jar}" suffix is removed. </p></li>
      *
      *         <li><p> If the name matches the regular expression {@code
      *         "-(\\d+(\\.|$))"} then the module name will be derived from the
      *         subsequence preceding the hyphen of the first occurrence. The
      *         subsequence after the hyphen is parsed as a {@link
-     *         ModuleDescriptor.Version} and ignored if it cannot be parsed as
-     *         a {@code Version}. </p></li>
+     *         ModuleDescriptor.Version Version} and ignored if it cannot be
+     *         parsed as a {@code Version}. </p></li>
      *
-     *         <li><p> For the module name, then any trailing digits and dots
-     *         are removed, all non-alphanumeric characters ({@code [^A-Za-z0-9]})
-     *         are replaced with a dot ({@code "."}), all repeating dots are
-     *         replaced with one dot, and all leading and trailing dots are
-     *         removed. </p></li>
+     *         <li><p> All non-alphanumeric characters ({@code [^A-Za-z0-9]})
+     *         in the module name are replaced with a dot ({@code "."}), all
+     *         repeating dots are replaced with one dot, and all leading and
+     *         trailing dots are removed. </p></li>
      *
-     *         <li><p> As an example, a JAR file named {@code foo-bar.jar} will
-     *         derive a module name {@code foo.bar} and no version. A JAR file
-     *         named {@code foo-1.2.3-SNAPSHOT.jar} will derive a module name
-     *         {@code foo} and {@code 1.2.3-SNAPSHOT} as the version. </p></li>
+     *         <li><p> As an example, a JAR file named "{@code foo-bar.jar}" will
+     *         derive a module name "{@code foo.bar}" and no version. A JAR file
+     *         named "{@code foo-bar-1.2.3-SNAPSHOT.jar}" will derive a module
+     *         name "{@code foo.bar}" and "{@code 1.2.3-SNAPSHOT}" as the version.
+     *         </p></li>
      *
      *     </ul></li>
      *
@@ -286,20 +291,21 @@ public interface ModuleFinder {
      *     class names of provider classes. </p></li>
      *
      *     <li><p> If the JAR file has a {@code Main-Class} attribute in its
-     *     main manifest then its value is the module {@link
-     *     ModuleDescriptor#mainClass() main class}. </p></li>
+     *     main manifest, its value is a legal class name, and its package is
+     *     in the set of packages derived for the module, then the value is the
+     *     module {@linkplain ModuleDescriptor#mainClass() main class}. </p></li>
      *
      * </ul>
      *
      * <p> If a {@code ModuleDescriptor} cannot be created (by means of the
      * {@link ModuleDescriptor.Builder ModuleDescriptor.Builder} API) for an
      * automatic module then {@code FindException} is thrown. This can arise
-     * when a legal module name cannot be derived from the file name of the JAR
-     * file, where the JAR file contains a {@code .class} in the top-level
-     * directory of the JAR file, where an entry in a service configuration
-     * file is not a legal class name or its package name is not in the set of
-     * packages derived for the module, or where the module main class is not
-     * a legal class name or its package is not in the module. </p>
+     * when the value of the "{@code Automatic-Module-Name}" attribute is not a
+     * legal module name, a legal module name cannot be derived from the file
+     * name of the JAR file, where the JAR file contains a {@code .class} in
+     * the top-level directory of the JAR file, where an entry in a service
+     * configuration file is not a legal class name or its package name is not
+     * in the set of packages derived for the module. </p>
      *
      * <p> In addition to JAR files, an implementation may also support modules
      * that are packaged in other implementation specific module formats. If
@@ -312,7 +318,9 @@ public interface ModuleFinder {
      *
      * <p> As with automatic modules, the contents of a packaged or exploded
      * module may need to be <em>scanned</em> in order to determine the packages
-     * in the module. If a {@code .class} file (other than {@code
+     * in the module. Whether {@linkplain java.nio.file.Files#isHidden(Path)
+     * hidden files} are ignored or not is implementation specific and therefore
+     * not specified. If a {@code .class} file (other than {@code
      * module-info.class}) is found in the top-level directory then it is
      * assumed to be a class in the unnamed package and so {@code FindException}
      * is thrown. </p>

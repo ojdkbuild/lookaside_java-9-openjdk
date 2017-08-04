@@ -142,10 +142,9 @@ public class Modules extends JCTree.Visitor {
     private final ModuleFinder moduleFinder;
     private final Source source;
     private final boolean allowModules;
+    private final boolean allowAccessIntoSystem;
 
     public final boolean multiModuleMode;
-
-    private final String legacyModuleOverride;
 
     private final Name java_se;
     private final Name java_;
@@ -192,9 +191,8 @@ public class Modules extends JCTree.Visitor {
         allowModules = source.allowModules();
         Options options = Options.instance(context);
 
+        allowAccessIntoSystem = options.isUnset(Option.RELEASE);
         lintOptions = options.isUnset(Option.XLINT_CUSTOM, "-" + LintCategory.OPTIONS.option);
-
-        legacyModuleOverride = options.get(Option.XMODULE);
 
         multiModuleMode = fileManager.hasLocation(StandardLocation.MODULE_SOURCE_PATH);
         ClassWriter classWriter = ClassWriter.instance(context);
@@ -211,6 +209,8 @@ public class Modules extends JCTree.Visitor {
         limitModsOpt = options.get(Option.LIMIT_MODULES);
         moduleVersionOpt = options.get(Option.MODULE_VERSION);
     }
+    //where
+        private static final String XMODULES_PREFIX = "-Xmodule:";
 
     int depth = -1;
     private void dprintln(String msg) {
@@ -459,9 +459,6 @@ public class Modules extends JCTree.Visitor {
                             if (moduleOverride != null) {
                                 checkNoAllModulePath();
                                 defaultModule = moduleFinder.findModule(names.fromString(moduleOverride));
-                                if (legacyModuleOverride != null) {
-                                    defaultModule.sourceLocation = StandardLocation.SOURCE_PATH;
-                                }
                                 defaultModule.patchOutputLocation = StandardLocation.CLASS_OUTPUT;
                             } else {
                                 // Question: why not do findAllModules and initVisiblePackages here?
@@ -524,15 +521,50 @@ public class Modules extends JCTree.Visitor {
                 module = defaultModule;
             }
 
-            for (JCCompilationUnit tree: trees) {
+            for (JCCompilationUnit tree : trees) {
+                if (defaultModule != syms.unnamedModule
+                        && defaultModule.sourceLocation == StandardLocation.SOURCE_PATH
+                        && fileManager.hasLocation(StandardLocation.SOURCE_PATH)) {
+                    checkSourceLocation(tree, module);
+                }
                 tree.modle = module;
             }
         }
     }
 
+    private void checkSourceLocation(JCCompilationUnit tree, ModuleSymbol msym) {
+        try {
+            JavaFileObject fo = tree.sourcefile;
+            if (fileManager.contains(msym.sourceLocation, fo)) {
+                return;
+            }
+            if (msym.patchLocation != null && fileManager.contains(msym.patchLocation, fo)) {
+                return;
+            }
+            if (fileManager.hasLocation(StandardLocation.SOURCE_OUTPUT)) {
+                if (fileManager.contains(StandardLocation.SOURCE_OUTPUT, fo)) {
+                    return;
+                }
+            } else {
+                if (fileManager.contains(StandardLocation.CLASS_OUTPUT, fo)) {
+                    return;
+                }
+            }
+        } catch (IOException e) {
+            throw new Error(e);
+        }
+
+        JavaFileObject prev = log.useSource(tree.sourcefile);
+        try {
+            log.error(tree.pos(), "file.sb.on.source.or.patch.path.for.module");
+        } finally {
+            log.useSource(prev);
+        }
+    }
+
     private String singleModuleOverride(List<JCCompilationUnit> trees) {
         if (!fileManager.hasLocation(StandardLocation.PATCH_MODULE_PATH)) {
-            return legacyModuleOverride;
+            return null;
         }
 
         Set<String> override = new LinkedHashSet<>();
@@ -552,7 +584,7 @@ public class Modules extends JCTree.Visitor {
         }
 
         switch (override.size()) {
-            case 0: return legacyModuleOverride;
+            case 0: return null;
             case 1: return override.iterator().next();
             default:
                 log.error(Errors.TooManyPatchedModules(override));
@@ -1084,6 +1116,7 @@ public class Modules extends JCTree.Visitor {
         public void visitRequires(JCRequires tree) {
             if (tree.directive != null && allModules().contains(tree.directive.module)) {
                 chk.checkDeprecated(tree.moduleName.pos(), msym, tree.directive.module);
+                chk.checkModuleRequires(tree.moduleName.pos(), tree.directive);
                 msym.directives = msym.directives.prepend(tree.directive);
             }
         }
@@ -1181,7 +1214,7 @@ public class Modules extends JCTree.Visitor {
             for (String limit : extraLimitMods) {
                 limitMods.add(syms.enterModule(names.fromString(limit)));
             }
-            observable = computeTransitiveClosure(limitMods, null);
+            observable = computeTransitiveClosure(limitMods, rootModules, null);
             observable.addAll(rootModules);
             if (lintOptions) {
                 for (ModuleSymbol msym : limitMods) {
@@ -1240,7 +1273,7 @@ public class Modules extends JCTree.Visitor {
                     case ALL_SYSTEM:
                         modules = new HashSet<>(syms.getAllModules())
                                 .stream()
-                                .filter(systemModulePred.and(observablePred).and(noIncubatorPred));
+                                .filter(systemModulePred.and(observablePred));
                         break;
                     case ALL_MODULE_PATH:
                         modules = new HashSet<>(syms.getAllModules())
@@ -1261,9 +1294,18 @@ public class Modules extends JCTree.Visitor {
             }
         }
 
-        Set<ModuleSymbol> result = computeTransitiveClosure(enabledRoot, observable);
+        Set<ModuleSymbol> result = computeTransitiveClosure(enabledRoot, rootModules, observable);
 
         result.add(syms.unnamedModule);
+
+        boolean hasAutomatic = result.stream().anyMatch(IS_AUTOMATIC);
+
+        if (hasAutomatic) {
+            syms.getAllModules()
+                .stream()
+                .filter(IS_AUTOMATIC)
+                .forEach(result::add);
+        }
 
         String incubatingModules = result.stream()
                 .filter(msym -> msym.resolutionFlags.contains(ModuleResolutionFlags.WARN_INCUBATING))
@@ -1282,17 +1324,26 @@ public class Modules extends JCTree.Visitor {
             rootModules.forEach(m -> m.version = version);
         }
     }
+    //where:
+        private static final Predicate<ModuleSymbol> IS_AUTOMATIC =
+                m -> (m.flags_field & Flags.AUTOMATIC_MODULE) != 0;
 
     public boolean isInModuleGraph(ModuleSymbol msym) {
         return allModules == null || allModules.contains(msym);
     }
 
-    private Set<ModuleSymbol> computeTransitiveClosure(Set<? extends ModuleSymbol> base, Set<ModuleSymbol> observable) {
+    private Set<ModuleSymbol> computeTransitiveClosure(Set<? extends ModuleSymbol> base,
+                                                       Set<? extends ModuleSymbol> rootModules,
+                                                       Set<ModuleSymbol> observable) {
         List<ModuleSymbol> primaryTodo = List.nil();
         List<ModuleSymbol> secondaryTodo = List.nil();
 
         for (ModuleSymbol ms : base) {
-            primaryTodo = primaryTodo.prepend(ms);
+            if (rootModules.contains(ms)) {
+                primaryTodo = primaryTodo.prepend(ms);
+            } else {
+                secondaryTodo = secondaryTodo.prepend(ms);
+            }
         }
 
         Set<ModuleSymbol> result = new LinkedHashSet<>();
@@ -1315,12 +1366,12 @@ public class Modules extends JCTree.Visitor {
             if (!result.add(current) || current == syms.unnamedModule || ((current.flags_field & Flags.AUTOMATIC_MODULE) != 0))
                 continue;
             current.complete();
-            if (current.kind == ERR && isPrimaryTodo && warnedMissing.add(current)) {
+            if (current.kind == ERR && (isPrimaryTodo || base.contains(current)) && warnedMissing.add(current)) {
                 log.error(Errors.ModuleNotFound(current));
             }
             for (RequiresDirective rd : current.requires) {
                 if (rd.module == syms.java_base) continue;
-                if ((rd.isTransitive() && isPrimaryTodo) || base.contains(current)) {
+                if ((rd.isTransitive() && isPrimaryTodo) || rootModules.contains(current)) {
                     primaryTodo = primaryTodo.prepend(rd.module);
                 } else {
                     secondaryTodo = secondaryTodo.prepend(rd.module);
@@ -1427,6 +1478,10 @@ public class Modules extends JCTree.Visitor {
             }
         }
 
+        if (!allowAccessIntoSystem && (msym.flags() & Flags.SYSTEM_MODULE) != 0 &&
+            msym.patchLocation != null) {
+            log.error(Errors.PatchModuleWithRelease(msym));
+        }
     }
 
     private Set<ModuleSymbol> retrieveRequiresTransitive(ModuleSymbol msym) {
@@ -1501,8 +1556,13 @@ public class Modules extends JCTree.Visitor {
                                                             : null;
                     DiagnosticPosition pos = env != null ? env.tree.pos() : null;
                     try {
-                        log.error(pos, Errors.PackageClashFromRequires(msym, packageName,
-                                                                      previousModule, exportsFrom));
+                        if (msym.isUnnamed()) {
+                            log.error(pos, Errors.PackageClashFromRequiresInUnnamed(packageName,
+                                                                                    previousModule, exportsFrom));
+                        } else {
+                            log.error(pos, Errors.PackageClashFromRequires(msym, packageName,
+                                                                           previousModule, exportsFrom));
+                        }
                     } finally {
                         if (env != null)
                             log.useSource(origSource);
@@ -1552,6 +1612,12 @@ public class Modules extends JCTree.Visitor {
 
             if (!isValidName(packageName))
                 continue;
+
+            if (!allowAccessIntoSystem && (msym.flags() & Flags.SYSTEM_MODULE) != 0) {
+                log.error(Errors.AddExportsWithRelease(msym));
+                continue;
+            }
+
             PackageSymbol p = syms.enterPackage(msym, names.fromString(packageName));
             p.modle = msym;  // TODO: do we need this?
 
@@ -1624,6 +1690,11 @@ public class Modules extends JCTree.Visitor {
                 if (lintOptions) {
                     log.warning(Warnings.ModuleForOptionNotFound(Option.ADD_READS, msym));
                 }
+                continue;
+            }
+
+            if (!allowAccessIntoSystem && (msym.flags() & Flags.SYSTEM_MODULE) != 0) {
+                log.error(Errors.AddReadsWithRelease(msym));
                 continue;
             }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2017, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -192,7 +192,7 @@ class MultiExchange<U,T> {
     }
 
     HttpClient.Version version() {
-        return client.version();
+        return request.version().orElse(client.version());
     }
 
     private synchronized void setExchange(Exchange<T> exchange) {
@@ -316,13 +316,14 @@ class MultiExchange<U,T> {
                 })
             // 5. Handle errors and cancel any timer set
             .handle((response, ex) -> {
-                if (response != null) {
+                cancelTimer();
+                if (ex == null) {
+                    assert response != null;
                     return MinimalFuture.completedFuture(response);
                 }
                 // all exceptions thrown are handled here
                 CompletableFuture<Response> error = getExceptionalCF(ex);
                 if (error == null) {
-                    cancelTimer();
                     return responseAsyncImpl();
                 } else {
                     return error;
@@ -356,10 +357,6 @@ class MultiExchange<U,T> {
         @Override
         public void handle() {
             cancel(new HttpTimeoutException("request timed out"));
-        }
-        @Override
-        public String toString() {
-            return "[deadline = " + deadline() + "]";
         }
     }
 }

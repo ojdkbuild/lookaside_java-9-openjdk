@@ -412,6 +412,14 @@ final class HotSpotResolvedObjectTypeImpl extends HotSpotResolvedJavaType implem
     }
 
     @Override
+    public ResolvedJavaType getHostClass() {
+        if (isArray()) {
+            return null;
+        }
+        return compilerToVM().getHostClass(this);
+    }
+
+    @Override
     public boolean isJavaLangObject() {
         return javaClass.equals(Object.class);
     }
@@ -801,8 +809,7 @@ final class HotSpotResolvedObjectTypeImpl extends HotSpotResolvedJavaType implem
         }
         if (elementType.getName().startsWith("Ljava/")) {
             // Classes in a java.* package can only be defined by the
-            // boot class loader. This is enforced by ClassLoader.preDefineClass()
-            assert mirror().getClassLoader() == null;
+            // boot or platform class loader.
             return true;
         }
         ClassLoader thisCl = mirror().getClassLoader();
@@ -847,6 +854,15 @@ final class HotSpotResolvedObjectTypeImpl extends HotSpotResolvedJavaType implem
     @Override
     public ResolvedJavaField findInstanceFieldWithOffset(long offset, JavaKind expectedEntryKind) {
         ResolvedJavaField[] declaredFields = getInstanceFields(true);
+        return findFieldWithOffset(offset, expectedEntryKind, declaredFields);
+    }
+
+    public ResolvedJavaField findStaticFieldWithOffset(long offset, JavaKind expectedEntryKind) {
+        ResolvedJavaField[] declaredFields = getStaticFields();
+        return findFieldWithOffset(offset, expectedEntryKind, declaredFields);
+    }
+
+    private static ResolvedJavaField findFieldWithOffset(long offset, JavaKind expectedEntryKind, ResolvedJavaField[] declaredFields) {
         for (ResolvedJavaField field : declaredFields) {
             HotSpotResolvedJavaField resolvedField = (HotSpotResolvedJavaField) field;
             long resolvedFieldOffset = resolvedField.offset();

@@ -35,12 +35,12 @@ import jdk.internal.module.ModuleInfo;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.lang.module.Configuration;
 import java.lang.module.ModuleDescriptor;
 import java.lang.module.ModuleDescriptor.Exports;
 import java.lang.module.ModuleDescriptor.Opens;
 import java.lang.module.ModuleFinder;
 import java.lang.module.ModuleReference;
-import java.lang.reflect.Module;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -69,10 +69,8 @@ public class JdkQualifiedExportTest {
     }
 
     static Set<String> KNOWN_EXCEPTIONS =
-        Set.of("java.xml/com.sun.xml.internal.stream.writers",
+        Set.of("jdk.internal.vm.ci/jdk.vm.ci.services",
                "jdk.jsobject/jdk.internal.netscape.javascript.spi");
-    static Set<String> DEPLOY_MODULES =
-        Set.of("jdk.deploy", "jdk.plugin", "jdk.javaws");
 
     static void checkExports(ModuleDescriptor md) {
         // build a map of upgradeable module to Exports that are qualified to it
@@ -81,8 +79,7 @@ public class JdkQualifiedExportTest {
         md.exports().stream()
           .filter(Exports::isQualified)
           .forEach(e -> e.targets().stream()
-                         .filter(mn -> !HashedModules.contains(mn) &&
-                                           ModuleFinder.ofSystem().find(mn).isPresent())
+                         .filter(mn -> accept(md, mn))
                          .forEach(t -> targetToExports.computeIfAbsent(t, _k -> new HashSet<>())
                                                       .add(e)));
 
@@ -98,10 +95,9 @@ public class JdkQualifiedExportTest {
                                                        exp.source(), e.getKey()));
                 });
 
-            // workaround until all qualified exports to upgradeable modules
-            // are eliminated
+            // no qualified exports to upgradeable modules are expected
+            // except the known exception cases
             if (targetToExports.entrySet().stream()
-                    .filter(e -> !DEPLOY_MODULES.contains(e.getKey()))
                     .flatMap(e -> e.getValue().stream())
                     .anyMatch(e -> !KNOWN_EXCEPTIONS.contains(mn + "/" + e.source()))) {
                 throw new RuntimeException(mn + " can't export package to upgradeable modules");
@@ -116,8 +112,7 @@ public class JdkQualifiedExportTest {
         md.opens().stream()
             .filter(Opens::isQualified)
             .forEach(e -> e.targets().stream()
-                           .filter(mn -> !HashedModules.contains(mn) &&
-                                            ModuleFinder.ofSystem().find(mn).isPresent())
+                           .filter(mn -> accept(md, mn))
                            .forEach(t -> targetToOpens.computeIfAbsent(t, _k -> new HashSet<>())
                                                       .add(e)));
 
@@ -135,6 +130,23 @@ public class JdkQualifiedExportTest {
 
             throw new RuntimeException(mn + " can't open package to upgradeable modules");
         }
+    }
+
+    /**
+     * Returns true if target is an upgradeable module but not required
+     * by the source module directly and indirectly.
+     */
+    private static boolean accept(ModuleDescriptor source, String target) {
+        if (HashedModules.contains(target))
+            return false;
+
+        if (!ModuleFinder.ofSystem().find(target).isPresent())
+            return false;
+
+        Configuration cf = Configuration.empty().resolve(ModuleFinder.of(),
+                                                         ModuleFinder.ofSystem(),
+                                                         Set.of(source.name()));
+        return !cf.findModule(target).isPresent();
     }
 
     private static class HashedModules {

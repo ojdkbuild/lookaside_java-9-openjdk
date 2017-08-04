@@ -160,6 +160,7 @@ endef
 ifeq ($(TEST), )
   $(info No test selection given in TEST!)
   $(info Please use e.g. 'run-test TEST=tier1' or 'run-test-tier1')
+  $(info See common/doc/testing.[md|html] for help)
   $(error Cannot continue)
 endif
 
@@ -182,6 +183,7 @@ $(foreach test, $(TEST), \
 
 ifneq ($(UNKNOWN_TEST), )
   $(info Unknown test selection: '$(UNKNOWN_TEST)')
+  $(info See common/doc/testing.[md|html] for help)
   $(error Cannot continue)
 endif
 
@@ -296,6 +298,12 @@ define SetupRunJtregTestBody
 
   $1_TEST_NAME := $$(strip $$(patsubst jtreg:%, %, $$($1_TEST)))
   $1_COMPONENT := $$(firstword $$(subst /, $$(SPACE), $$($1_TEST_NAME)))
+
+  ifeq ($$(JT_HOME), )
+    $$(info Error: jtreg framework is not found.)
+    $$(info Please run configure using --with-jtreg.)
+    $$(error Cannot continue)
+  endif
 
   # Unfortunately, we need different defaults for some JTREG values,
   # depending on what component we're running.

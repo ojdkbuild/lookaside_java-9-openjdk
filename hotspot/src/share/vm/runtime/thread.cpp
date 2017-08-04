@@ -3404,7 +3404,7 @@ static void call_initPhase1(TRAPS) {
 //
 //     After phase 2, The VM will begin search classes from -Xbootclasspath/a.
 static void call_initPhase2(TRAPS) {
-  TraceTime timer("Phase2 initialization", TRACETIME_LOG(Info, modules, startuptime));
+  TraceTime timer("Phase2 initialization", TRACETIME_LOG(Info, module, startuptime));
 
   Klass* k = SystemDictionary::resolve_or_fail(vmSymbols::java_lang_System(), true, CHECK);
   instanceKlassHandle klass (THREAD, k);
@@ -3465,7 +3465,7 @@ void Threads::initialize_java_lang_classes(JavaThread* main_thread, TRAPS) {
                                       java_lang_Thread::RUNNABLE);
 
   // The VM creates objects of this class.
-  initialize_class(vmSymbols::java_lang_reflect_Module(), CHECK);
+  initialize_class(vmSymbols::java_lang_Module(), CHECK);
 
   // The VM preresolves methods to these classes. Make sure that they get initialized
   initialize_class(vmSymbols::java_lang_reflect_Method(), CHECK);

@@ -26,8 +26,6 @@ package p1;
 import java.io.InputStream;
 import java.io.IOException;
 import java.lang.module.ModuleDescriptor;
-import java.lang.reflect.Layer;
-import java.lang.reflect.Module;
 import java.net.URI;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
@@ -64,8 +62,7 @@ public class Main {
         // parse module-info.class
         ClassReader cr = new ClassReader(in);
         cr.accept(cv, attrs, 0);
-        return modTargets[0] != null &&
-            (modTargets[0].osName() != null || modTargets[0].osArch() != null);
+        return modTargets[0] != null && modTargets[0].targetPlatform() != null;
     }
 
     public static void main(String... args) throws Exception {

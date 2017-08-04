@@ -55,7 +55,7 @@ import java.util.Arrays;
  * {@code IndexColorModel} objects are never pre-multiplied with
  * the alpha components.
  * <p>
- * <a name="transparency">
+ * <a id="transparency">
  * The transparency of an {@code IndexColorModel} object is
  * determined by examining the alpha components of the colors in the
  * colormap and choosing the most specific value after considering
@@ -86,7 +86,7 @@ import java.util.Arrays;
  * and {@code getNumComponents} returns 4.
  *
  * <p>
- * <a name="index_values">
+ * <a id="index_values">
  * The values used to index into the colormap are taken from the least
  * significant <em>n</em> bits of pixel representations where
  * <em>n</em> is based on the pixel size specified in the constructor.
@@ -1514,7 +1514,17 @@ public class IndexColorModel extends ColorModel {
      * Disposes of system resources associated with this
      * {@code ColorModel} once this {@code ColorModel} is no
      * longer referenced.
+     *
+     * @deprecated The {@code finalize} method has been deprecated.
+     *     Subclasses that override {@code finalize} in order to perform cleanup
+     *     should be modified to use alternative cleanup mechanisms and
+     *     to remove the overriding {@code finalize} method.
+     *     When overriding the {@code finalize} method, its implementation must explicitly
+     *     ensure that {@code super.finalize()} is invoked as described in {@link Object#finalize}.
+     *     See the specification for {@link Object#finalize()} for further
+     *     information about migration options.
      */
+    @Deprecated(since="9")
     public void finalize() {
     }
 
