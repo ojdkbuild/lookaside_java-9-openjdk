@@ -120,7 +120,7 @@ public final class ModulePatcher {
 
                     // JAR file - do not open as a multi-release JAR as this
                     // is not supported by the boot class loader
-                    try (JarFile jf = new JarFile(file.toFile())) {
+                    try (JarFile jf = new JarFile(file.toString())) {
                         jf.stream()
                           .filter(e -> !e.isDirectory()
                                   && (!isAutomatic || e.getName().endsWith(".class")))
@@ -135,8 +135,9 @@ public final class ModulePatcher {
                     Path top = file;
                     Files.find(top, Integer.MAX_VALUE,
                                ((path, attrs) -> attrs.isRegularFile()))
-                            .filter(path -> !isAutomatic
+                            .filter(path -> (!isAutomatic
                                     || path.toString().endsWith(".class"))
+                                    && !isHidden(path))
                             .map(path -> toPackageName(top, path))
                             .filter(Checks::isPackageName)
                             .forEach(packages::add);
@@ -177,11 +178,13 @@ public final class ModulePatcher {
 
         ModuleTarget target = null;
         ModuleHashes recordedHashes = null;
+        ModuleHashes.HashSupplier hasher = null;
         ModuleResolution mres = null;
         if (mref instanceof ModuleReferenceImpl) {
             ModuleReferenceImpl impl = (ModuleReferenceImpl)mref;
             target = impl.moduleTarget();
             recordedHashes = impl.recordedHashes();
+            hasher = impl.hasher();
             mres = impl.moduleResolution();
         }
 
@@ -191,7 +194,7 @@ public final class ModulePatcher {
                                        this,
                                        target,
                                        recordedHashes,
-                                       null,
+                                       hasher,
                                        mres);
 
     }
@@ -428,7 +431,7 @@ public final class ModulePatcher {
         private final URL csURL;
 
         JarResourceFinder(Path path) throws IOException {
-            this.jf = new JarFile(path.toFile());
+            this.jf = new JarFile(path.toString());
             this.csURL = path.toUri().toURL();
         }
 
@@ -502,7 +505,7 @@ public final class ModulePatcher {
         public Resource find(String name) throws IOException {
             Path file = Resources.toFilePath(dir, name);
             if (file != null) {
-                return  newResource(name, dir, file);
+                return newResource(name, dir, file);
             } else {
                 return null;
             }
@@ -556,7 +559,7 @@ public final class ModulePatcher {
 
 
     /**
-     * Derives a package name from a file path to a .class file.
+     * Derives a package name from the file path of an entry in an exploded patch
      */
     private static String toPackageName(Path top, Path file) {
         Path entry = top.relativize(file);
@@ -565,6 +568,17 @@ public final class ModulePatcher {
             return warnIfModuleInfo(top, entry.toString());
         } else {
             return parent.toString().replace(File.separatorChar, '.');
+        }
+    }
+
+    /**
+     * Returns true if the given file exists and is a hidden file
+     */
+    private boolean isHidden(Path file) {
+        try {
+            return Files.isHidden(file);
+        } catch (IOException ioe) {
+            return false;
         }
     }
 

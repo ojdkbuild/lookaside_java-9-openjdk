@@ -28,7 +28,7 @@ package java.lang.module;
 import java.io.PrintStream;
 import java.lang.module.ModuleDescriptor.Provides;
 import java.lang.module.ModuleDescriptor.Requires.Modifier;
-import java.lang.reflect.Layer;
+import java.net.URI;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -39,10 +39,8 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.StringJoiner;
 import java.util.stream.Collectors;
 
 import jdk.internal.module.ModuleHashes;
@@ -67,12 +65,13 @@ final class Resolver {
     // maps module name to module reference
     private final Map<String, ModuleReference> nameToReference = new HashMap<>();
 
-    // module constraints on target platform
-    private String osName;
-    private String osArch;
+    // true if all automatic modules have been found
+    private boolean haveAllAutomaticModules;
 
-    String osName() { return osName; }
-    String osArch() { return osArch; }
+    // constraint on target platform
+    private String targetPlatform;
+
+    String targetPlatform() { return targetPlatform; }
 
     /**
      * @throws IllegalArgumentException if there are more than one parent and
@@ -87,35 +86,21 @@ final class Resolver {
         this.afterFinder = afterFinder;
         this.traceOutput = traceOutput;
 
-        // record constraints on target platform, checking that they don't conflict
+        // record constraint on target platform, checking for conflicts
         for (Configuration parent : parents) {
-            String value = parent.osName();
+            String value = parent.targetPlatform();
             if (value != null) {
-                if (osName == null) {
-                    osName = value;
+                if (targetPlatform == null) {
+                    targetPlatform = value;
                 } else {
-                    if (!value.equals(osName)) {
-                        failParentConflict("Operating System", osName, value);
-                    }
-                }
-            }
-            value = parent.osArch();
-            if (value != null) {
-                if (osArch == null) {
-                    osArch = value;
-                } else {
-                    if (!value.equals(osArch)) {
-                        failParentConflict("OS architecture", osArch, value);
+                    if (!value.equals(targetPlatform)) {
+                        String msg = "Parents have conflicting constraints on target" +
+                                     "  platform: " + targetPlatform + ", " + value;
+                        throw new IllegalArgumentException(msg);
                     }
                 }
             }
         }
-    }
-
-    private void failParentConflict(String constraint, String s1, String s2) {
-        String msg = "Parents have conflicting constraints on target "
-                     + constraint + ": " + s1 + ", " + s2;
-        throw new IllegalArgumentException(msg);
     }
 
     /**
@@ -145,8 +130,7 @@ final class Resolver {
             }
 
             if (isTracing()) {
-                trace("Root module %s located", root);
-                mref.location().ifPresent(uri -> trace("  (%s)", uri));
+                trace("root %s", nameAndInfo(mref));
             }
 
             addFoundModule(mref);
@@ -170,6 +154,19 @@ final class Resolver {
         while (!q.isEmpty()) {
             ModuleDescriptor descriptor = q.poll();
             assert nameToReference.containsKey(descriptor.name());
+
+            // if the module is an automatic module then all automatic
+            // modules need to be resolved
+            if (descriptor.isAutomatic() && !haveAllAutomaticModules) {
+                addFoundAutomaticModules().forEach(mref -> {
+                    ModuleDescriptor other = mref.descriptor();
+                    q.offer(other);
+                    if (isTracing()) {
+                        trace("%s requires %s", descriptor.name(), nameAndInfo(mref));
+                    }
+                });
+                haveAllAutomaticModules = true;
+            }
 
             // process dependences
             for (ModuleDescriptor.Requires requires : descriptor.requires()) {
@@ -196,16 +193,13 @@ final class Resolver {
                     }
                 }
 
+                if (isTracing() && !dn.equals("java.base")) {
+                    trace("%s requires %s", descriptor.name(), nameAndInfo(mref));
+                }
+
                 if (!nameToReference.containsKey(dn)) {
                     addFoundModule(mref);
                     q.offer(mref.descriptor());
-                    resolved.add(mref.descriptor());
-
-                    if (isTracing()) {
-                        trace("Module %s located, required by %s",
-                              dn, descriptor.name());
-                        mref.location().ifPresent(uri -> trace("  (%s)", uri));
-                    }
                 }
 
             }
@@ -250,7 +244,7 @@ final class Resolver {
 
         // the initial set of modules that may use services
         Set<ModuleDescriptor> initialConsumers;
-        if (Layer.boot() == null) {
+        if (ModuleLayer.boot() == null) {
             initialConsumers = new HashSet<>();
         } else {
             initialConsumers = parents.stream()
@@ -269,6 +263,13 @@ final class Resolver {
         do {
             for (ModuleDescriptor descriptor : candidateConsumers) {
                 if (!descriptor.uses().isEmpty()) {
+
+                    // the modules that provide at least one service
+                    Set<ModuleDescriptor> modulesToBind = null;
+                    if (isTracing()) {
+                        modulesToBind = new HashSet<>();
+                    }
+
                     for (String service : descriptor.uses()) {
                         Set<ModuleReference> mrefs = availableProviders.get(service);
                         if (mrefs != null) {
@@ -276,15 +277,13 @@ final class Resolver {
                                 ModuleDescriptor provider = mref.descriptor();
                                 if (!provider.equals(descriptor)) {
 
-                                    trace("Module %s provides %s, used by %s",
-                                            provider.name(), service, descriptor.name());
+                                    if (isTracing() && modulesToBind.add(provider)) {
+                                        trace("%s binds %s", descriptor.name(),
+                                                nameAndInfo(mref));
+                                    }
 
                                     String pn = provider.name();
                                     if (!nameToReference.containsKey(pn)) {
-                                        if (isTracing()) {
-                                            mref.location()
-                                                .ifPresent(uri -> trace("  (%s)", uri));
-                                        }
                                         addFoundModule(mref);
                                         q.push(provider);
                                     }
@@ -301,6 +300,21 @@ final class Resolver {
         return this;
     }
 
+    /**
+     * Add all automatic modules that have not already been found to the
+     * nameToReference map.
+     */
+    private Set<ModuleReference> addFoundAutomaticModules() {
+        Set<ModuleReference> result = new HashSet<>();
+        findAll().forEach(mref -> {
+            String mn = mref.descriptor().name();
+            if (mref.descriptor().isAutomatic() && !nameToReference.containsKey(mn)) {
+                addFoundModule(mref);
+                result.add(mref);
+            }
+        });
+        return result;
+    }
 
     /**
      * Add the module to the nameToReference map. Also check any constraints on
@@ -312,58 +326,30 @@ final class Resolver {
         if (mref instanceof ModuleReferenceImpl) {
             ModuleTarget target = ((ModuleReferenceImpl)mref).moduleTarget();
             if (target != null)
-                checkTargetConstraints(mn, target);
+                checkTargetPlatform(mn, target);
         }
 
         nameToReference.put(mn, mref);
     }
 
     /**
-     * Check that the module's constraints on the target platform do not
-     * conflict with the constraints of other modules resolved so far or
-     * modules in parent configurations.
+     * Check that the module's constraints on the target platform does
+     * conflict with the constraint of other modules resolved so far.
      */
-    private void checkTargetConstraints(String mn, ModuleTarget target) {
-        String value = target.osName();
+    private void checkTargetPlatform(String mn, ModuleTarget target) {
+        String value = target.targetPlatform();
         if (value != null) {
-            if (osName == null) {
-                osName = value;
+            if (targetPlatform == null) {
+                targetPlatform = value;
             } else {
-                if (!value.equals(osName)) {
-                    failTargetConstraint(mn, target);
-                }
-            }
-        }
-        value = target.osArch();
-        if (value != null) {
-            if (osArch == null) {
-                osArch = value;
-            } else {
-                if (!value.equals(osArch)) {
-                    failTargetConstraint(mn, target);
+                if (!value.equals(targetPlatform)) {
+                    findFail("Module %s has constraints on target platform (%s)"
+                             + " that conflict with other modules: %s", mn,
+                             value, targetPlatform);
                 }
             }
         }
     }
-
-    private void failTargetConstraint(String mn, ModuleTarget target) {
-        String s1 = targetAsString(osName, osArch);
-        String s2 = targetAsString(target.osName(), target.osArch());
-        findFail("Module %s has constraints on target platform (%s) that"
-                 + " conflict with other modules: %s", mn, s1, s2);
-    }
-
-    private String targetAsString(ModuleTarget target) {
-        return targetAsString(target.osName(), target.osArch());
-    }
-
-    private String targetAsString(String osName, String osArch) {
-        return new StringJoiner("-")
-                .add(Objects.toString(osName, "*"))
-                .add(Objects.toString(osArch, "*"))
-                .toString();
-    }
-
 
     /**
      * Execute post-resolution checks and returns the module graph of resolved
@@ -375,12 +361,6 @@ final class Resolver {
     Map<ResolvedModule, Set<ResolvedModule>> finish(Configuration cf,
                                                     boolean check)
     {
-        if (isTracing()) {
-            trace("Result:");
-            Set<String> names = nameToReference.keySet();
-            names.stream().sorted().forEach(name -> trace("  %s", name));
-        }
-
         if (check) {
             detectCycles();
             checkHashes();
@@ -483,9 +463,8 @@ final class Resolver {
                     findFail("Unable to compute the hash of module %s", dn);
                 }
 
-                // skip checking the hash if the module has been patched
                 ModuleReferenceImpl other = (ModuleReferenceImpl)mref2;
-                if (other != null && !other.isPatched()) {
+                if (other != null) {
                     byte[] recordedHash = hashes.hashFor(dn);
                     byte[] actualHash = other.computeHash(algorithm);
                     if (actualHash == null)
@@ -534,7 +513,7 @@ final class Resolver {
         // need "requires transitive" from the modules in parent configurations
         // as there may be selected modules that have a dependency on modules in
         // the parent configuration.
-        if (Layer.boot() == null) {
+        if (ModuleLayer.boot() == null) {
             g2 = new HashMap<>(capacity);
         } else {
             g2 = parents.stream()
@@ -928,9 +907,17 @@ final class Resolver {
 
     private void trace(String fmt, Object ... args) {
         if (traceOutput != null) {
-            traceOutput.format("[Resolver] " + fmt, args);
+            traceOutput.format(fmt, args);
             traceOutput.println();
         }
     }
 
+    private String nameAndInfo(ModuleReference mref) {
+        ModuleDescriptor descriptor = mref.descriptor();
+        StringBuilder sb = new StringBuilder(descriptor.name());
+        mref.location().ifPresent(uri -> sb.append(" " + uri));
+        if (descriptor.isAutomatic())
+            sb.append(" automatic");
+        return sb.toString();
+    }
 }

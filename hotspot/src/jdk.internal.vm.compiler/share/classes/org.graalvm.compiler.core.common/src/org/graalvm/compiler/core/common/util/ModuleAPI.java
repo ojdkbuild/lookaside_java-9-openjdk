@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, 2017, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -53,27 +53,22 @@ public final class ModuleAPI {
     public static final ModuleAPI getModule;
 
     /**
-     * {@code jdk.internal.module.Modules.addExports(Module, String, Module)}.
-     */
-    public static final ModuleAPI addExports;
-
-    /**
-     * {@code java.lang.reflect.Module.getResourceAsStream(String)}.
+     * {@code java.lang.Module.getResourceAsStream(String)}.
      */
     public static final ModuleAPI getResourceAsStream;
 
     /**
-     * {@code java.lang.reflect.Module.canRead(Module)}.
+     * {@code java.lang.Module.canRead(Module)}.
      */
     public static final ModuleAPI canRead;
 
     /**
-     * {@code java.lang.reflect.Module.isExported(String)}.
+     * {@code java.lang.Module.isExported(String)}.
      */
     public static final ModuleAPI isExported;
 
     /**
-     * {@code java.lang.reflect.Module.isExported(String, Module)}.
+     * {@code java.lang.Module.isExported(String, Module)}.
      */
     public static final ModuleAPI isExportedTo;
 
@@ -116,13 +111,11 @@ public final class ModuleAPI {
             try {
                 getModule = new ModuleAPI(Class.class.getMethod("getModule"));
                 Class<?> moduleClass = getModule.method.getReturnType();
-                Class<?> modulesClass = Class.forName("jdk.internal.module.Modules");
                 getResourceAsStream = new ModuleAPI(moduleClass.getMethod("getResourceAsStream", String.class));
                 canRead = new ModuleAPI(moduleClass.getMethod("canRead", moduleClass));
                 isExported = new ModuleAPI(moduleClass.getMethod("isExported", String.class));
                 isExportedTo = new ModuleAPI(moduleClass.getMethod("isExported", String.class, moduleClass));
-                addExports = new ModuleAPI(modulesClass.getDeclaredMethod("addExports", moduleClass, String.class, moduleClass));
-            } catch (NoSuchMethodException | SecurityException | ClassNotFoundException e) {
+            } catch (NoSuchMethodException | SecurityException e) {
                 throw new InternalError(e);
             }
         } else {
@@ -132,8 +125,6 @@ public final class ModuleAPI {
             canRead = unavailable;
             isExported = unavailable;
             isExportedTo = unavailable;
-            addExports = unavailable;
         }
-
     }
 }

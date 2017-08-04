@@ -157,7 +157,7 @@ import static java.lang.module.ModuleDescriptor.Modifier.SYNTHETIC;
  * like they do for instances of {@code java.lang.Object}.
  * </ul>
  *
- * <h3><a name="membership">Package and Module Membership of Proxy Class</a></h3>
+ * <h3><a id="membership">Package and Module Membership of Proxy Class</a></h3>
  *
  * The package and module to which a proxy class belongs are chosen such that
  * the accessibility of the proxy class is in line with the accessibility of
@@ -218,7 +218,7 @@ import static java.lang.module.ModuleDescriptor.Modifier.SYNTHETIC;
  * a package that either is not exported/open by its containing module or is
  * exported/open in a qualified fashion by its containing module.
  *
- * <h3><a name="dynamicmodule">Dynamic Modules</a></h3>
+ * <h3><a id="dynamicmodule">Dynamic Modules</a></h3>
  * <p>
  * A dynamic module is a named module generated at runtime. A proxy class
  * defined in a dynamic module is encapsulated and not accessible to any module.
@@ -227,11 +227,11 @@ import static java.lang.module.ModuleDescriptor.Modifier.SYNTHETIC;
  * {@code Proxy.newProxyInstance} method should be used instead.
  *
  * <p>
- * A dynamic module can read the modules of all of the superinterfaces of a proxy class
- * and the modules of the types referenced by all public method signatures
+ * A dynamic module can read the modules of all of the superinterfaces of a proxy
+ * class and the modules of the types referenced by all public method signatures
  * of a proxy class.  If a superinterface or a referenced type, say {@code T},
- * is in a non-exported package, the {@linkplain java.lang.reflect.Module module}
- * of {@code T} is updated to export the package of {@code T} to the dynamic module.
+ * is in a non-exported package, the {@linkplain Module module} of {@code T} is
+ * updated to export the package of {@code T} to the dynamic module.
  *
  * <h3>Methods Duplicated in Multiple Proxy Interfaces</h3>
  *
@@ -894,7 +894,7 @@ public class Proxy implements java.io.Serializable {
      * that dispatches method invocations to the specified invocation
      * handler.
      * <p>
-     * <a name="restrictions">{@code IllegalArgumentException} will be thrown
+     * <a id="restrictions">{@code IllegalArgumentException} will be thrown
      * if any of the following restrictions is violated:</a>
      * <ul>
      * <li>All of {@code Class} objects in the given {@code interfaces} array

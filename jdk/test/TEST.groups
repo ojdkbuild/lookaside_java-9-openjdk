@@ -70,9 +70,11 @@ jdk_lang = \
     sun/reflect \
     jdk/internal/reflect \
     jdk/lambda \
+    jdk/internal/loader \
     jdk/internal/misc \
     jdk/internal/ref \
     jdk/internal/jimage \
+    jdk/internal/math \
     jdk/modules \
     vm
 
@@ -87,6 +89,7 @@ jdk_util = \
 jdk_util_other = \
     java/util \
     sun/util \
+    jdk/internal/util \
     -:jdk_collections \
     -:jdk_concurrent \
     -:jdk_stream
@@ -141,8 +144,7 @@ jdk_stream = \
     java/util/stream
 
 jdk_math = \
-    java/math \
-    jdk/internal/math
+    java/math
 
 jdk_io = \
     java/io
@@ -177,6 +179,7 @@ jdk_security2 = \
 jdk_security3 = \
     javax/security  \
     -javax/security/auth/kerberos \
+    com/sun/jarsigner \
     com/sun/security \
     -com/sun/security/jgss \
     com/sun/org/apache/xml/internal/security \
@@ -207,7 +210,8 @@ jdk_text = \
 jdk_management = \
     java/lang/management \
     com/sun/management \
-    sun/management
+    sun/management \
+    jdk/internal/agent
 
 jdk_instrument = \
     java/lang/instrument
@@ -245,8 +249,7 @@ svc_tools = \
     sun/tools \
     -sun/tools/java \
     -sun/tools/jrunscript \
-    sun/jvmstat \
-    demo/jvmti
+    sun/jvmstat
 
 jdk_tools = \
     :core_tools \
@@ -265,13 +268,11 @@ jdk_other = \
     javax/transaction \
     javax/xml \
     -javax/xml/crypto \
-    jdk/asm \
     jdk/internal/jline \
     com/sun/jndi \
     com/sun/corba \
     org/omg/CORBA \
-    lib/testlibrary \
-    sample
+    lib/testlibrary
 
 #
 # SCTP is its own group as it is highly sensitive to kernel/network config
@@ -463,7 +464,6 @@ jdk = \
 needs_jdk = \
   :jdk_jdi \
   com/sun/tools \
-  demo \
   jdk/security/jarsigner \
   sun/security/tools/jarsigner \
   sun/security/tools/policytool \
@@ -711,7 +711,7 @@ needs_compact2 = \
   java/security/BasicPermission/Wildcard.java \
   java/util/Arrays/ParallelPrefix.java  \
   java/util/Arrays/SetAllTest.java  \
-  java/util/BitSet/BitSetStreamTest.java  \
+  java/util/BitSet/stream/BitSetStreamTest.java  \
   java/util/Collection/CollectionDefaults.java  \
   java/util/Collections/CheckedIdentityMap.java  \
   java/util/Collections/CheckedMapBash.java  \
@@ -773,7 +773,6 @@ compact1_minimal = \
   javax \
   jdk \
   lib \
-  sample \
   sun \
   vm \
  -:needs_full_vm_compact1 \

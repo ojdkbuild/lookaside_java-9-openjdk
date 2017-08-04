@@ -24,8 +24,10 @@
  */
 
 /**
- * The OracleUCrypto security provider.
+ * Provides the implementation of the OracleUCrypto security provider.
  *
+ * @provides java.security.Provider
+ * @moduleGraph
  * @since 9
  */
 module jdk.crypto.ucrypto {
