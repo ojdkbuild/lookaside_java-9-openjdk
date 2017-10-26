@@ -471,11 +471,11 @@ endif
 #endif
 
 ifeq ($(USE_EXTERNAL_LIBJPEG), true)
-  LIBJPEG_LIBS := -ljpeg
+  LIBJPEG_LIBS := $(OJDKBUILD_LIBJPEG_LDFLAGS)
   BUILD_LIBJAVAJPEG_INCLUDE_FILES := \
       imageioJPEG.c \
       jpegdecoder.c
-  BUILD_LIBJAVAJPEG_HEADERS :=
+  BUILD_LIBJAVAJPEG_HEADERS := $(OJDKBUILD_LIBJPEG_CFLAGS)
 else
   LIBJPEG_LIBS :=
   BUILD_LIBJAVAJPEG_INCLUDE_FILES :=
@@ -833,14 +833,16 @@ ifeq ($(ENABLE_HEADLESS_ONLY), false)
       #
 
   ifeq ($(USE_EXTERNAL_LIBGIF), true)
-    GIFLIB_LIBS := -lgif
+    GIFLIB_LIBS := $(OJDKBUILD_GIFLIB_LDFLAGS)
     LIBSPLASHSCREEN_EXCLUDES := giflib
+    LIBSPLASHSCREEN_CFLAGS += $(OJDKBUILD_GIFLIB_CFLAGS)
   else
     LIBSPLASHSCREEN_CFLAGS += -I$(JDK_TOPDIR)/src/java.desktop/share/native/libsplashscreen/giflib
   endif
 
   ifeq ($(USE_EXTERNAL_LIBJPEG), true)
-    LIBJPEG_LIBS := -ljpeg
+    LIBJPEG_LIBS := $(OJDKBUILD_LIBJPEG_LDFLAGS)
+    LIBJPEG_CFLAGS := $(OJDKBUILD_LIBJPEG_CFLAGS)
   else
     LIBSPLASHSCREEN_DIRS += $(JDK_TOPDIR)/src/java.desktop/share/native/libjavajpeg
     LIBJPEG_CFLAGS := -I$(JDK_TOPDIR)/src/java.desktop/share/native/libjavajpeg
@@ -918,7 +920,7 @@ ifeq ($(ENABLE_HEADLESS_ONLY), false)
       EXCLUDES := $(LIBSPLASHSCREEN_EXCLUDES), \
       OPTIMIZATION := LOW, \
       CFLAGS := $(LIBSPLASHSCREEN_CFLAGS) $(CFLAGS_JDKLIB) \
-                $(GIFLIB_CFLAGS) $(LIBJPEG_CFLAGS) $(PNG_CFLAGS), \
+                $(GIFLIB_CFLAGS) $(LIBJPEG_CFLAGS) $(OJDKBUILD_LIBPNG_CFLAGS) ${OJDKBUILD_ZLIB_CFLAGS}, \
       DISABLED_WARNINGS_gcc := sign-compare type-limits unused-result maybe-uninitialized shift-negative-value, \
       DISABLED_WARNINGS_clang := incompatible-pointer-types, \
       DISABLED_WARNINGS_solstudio := E_NEWLINE_NOT_LAST E_DECLARATION_IN_CODE \
@@ -927,8 +929,8 @@ ifeq ($(ENABLE_HEADLESS_ONLY), false)
       MAPFILE := $(JDK_TOPDIR)/make/mapfiles/libsplashscreen/mapfile-vers, \
       LDFLAGS := $(LIBSPLASHSCREEN_LDFLAGS) $(LDFLAGS_JDKLIB) \
           $(call SET_SHARED_LIBRARY_ORIGIN), \
-      LIBS := $(JDKLIB_LIBS) $(LIBSPLASHSCREEN_LIBS) $(LIBZ) \
-                        $(GIFLIB_LIBS) $(LIBJPEG_LIBS) $(PNG_LIBS), \
+      LIBS := $(JDKLIB_LIBS) $(LIBSPLASHSCREEN_LIBS) ${OJDKBUILD_ZLIB_LDFLAGS} \
+                        $(GIFLIB_LIBS) $(LIBJPEG_LIBS) $(OJDKBUILD_LIBPNG_LDFLAGS), \
       LIBS_aix := -liconv, \
       VERSIONINFO_RESOURCE := $(GLOBAL_VERSION_INFO_RESOURCE), \
       RC_FLAGS := $(RC_FLAGS) \

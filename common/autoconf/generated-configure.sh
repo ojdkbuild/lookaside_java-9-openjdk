@@ -673,6 +673,23 @@ USE_EXTERNAL_LCMS
 LCMS_LIBS
 LCMS_CFLAGS
 USE_EXTERNAL_LIBZ
+OJDKBUILD_ZLIB_CFLAGS
+OJDKBUILD_ZLIB_LDFLAGS
+OJDKBUILD_ZLIB_BUNDLE_LIB_PATH
+OJDKBUILD_NSS_CFLAGS
+OJDKBUILD_NSS_LDFLAGS
+OJDKBUILD_NSS_BUNDLE_LIB_PATH
+USE_EXTERNAL_LIBGIF
+OJDKBUILD_GIFLIB_CFLAGS
+OJDKBUILD_GIFLIB_LDFLAGS
+OJDKBUILD_GIFLIB_BUNDLE_LIB_PATH
+OJDKBUILD_LIBPNG_CFLAGS
+OJDKBUILD_LIBPNG_LDFLAGS
+OJDKBUILD_LIBPNG_BUNDLE_LIB_PATH
+USE_EXTERNAL_LIBJPEG
+OJDKBUILD_LIBJPEG_CFLAGS
+OJDKBUILD_LIBJPEG_LDFLAGS
+OJDKBUILD_LIBJPEG_BUNDLE_LIB_PATH
 USE_EXTERNAL_LIBPNG
 PNG_LIBS
 PNG_CFLAGS
@@ -1376,6 +1393,24 @@ srcdir=
 verbose=
 x_includes=NONE
 x_libraries=NONE
+
+# ojdkbuild
+OJDKBUILD_ZLIB_CFLAGS=`pkg-config zlib --cflags --msvc-syntax`
+OJDKBUILD_ZLIB_LDFLAGS=`pkg-config zlib --libs --msvc-syntax`
+OJDKBUILD_ZLIB_BUNDLE_LIB_PATH=`pkg-config zlib --variable=bundle_lib_path`
+OJDKBUILD_NSS_CFLAGS=`pkg-config nss --cflags --msvc-syntax`
+OJDKBUILD_NSS_LDFLAGS=`pkg-config nss --libs --msvc-syntax`
+OJDKBUILD_NSS_BUNDLE_LIB_PATH=`pkg-config nss --variable=bundle_lib_path`
+OJDKBUILD_GIFLIB_CFLAGS=`pkg-config giflib --cflags --msvc-syntax`
+OJDKBUILD_GIFLIB_LDFLAGS=`pkg-config giflib --libs --msvc-syntax`
+OJDKBUILD_GIFLIB_BUNDLE_LIB_PATH=`pkg-config giflib --variable=bundle_lib_path`
+OJDKBUILD_LIBPNG_CFLAGS=`pkg-config libpng --cflags --msvc-syntax`
+OJDKBUILD_LIBPNG_LDFLAGS=`pkg-config libpng --libs --msvc-syntax`
+OJDKBUILD_LIBPNG_BUNDLE_LIB_PATH=`pkg-config libpng --variable=bundle_lib_path`
+OJDKBUILD_LIBJPEG_CFLAGS=`pkg-config libjpeg-turbo --cflags --msvc-syntax`
+OJDKBUILD_LIBJPEG_LDFLAGS=`pkg-config libjpeg-turbo --libs --msvc-syntax`
+OJDKBUILD_LIBJPEG_BUNDLE_LIB_PATH=`pkg-config libjpeg-turbo --variable=bundle_lib_path`
+# end ojdkbuild
 
 # Installation directory options.
 # These are left unexpanded so users can "make install exec_prefix=/foo"
@@ -64440,7 +64475,7 @@ $as_echo "${with_libjpeg}" >&6; }
     USE_EXTERNAL_LIBJPEG=false
   elif test "x${with_libjpeg}" = "xsystem"; then
     ac_fn_cxx_check_header_mongrel "$LINENO" "jpeglib.h" "ac_cv_header_jpeglib_h" "$ac_includes_default"
-if test "x$ac_cv_header_jpeglib_h" = xyes; then :
+if test "xyes" = xyes; then :
 
 else
    as_fn_error $? "--with-libjpeg=system specified, but jpeglib.h not found!" "$LINENO" 5
@@ -64483,7 +64518,7 @@ LIBS=$ac_check_lib_save_LIBS
 fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_jpeg_jpeg_CreateDecompress" >&5
 $as_echo "$ac_cv_lib_jpeg_jpeg_CreateDecompress" >&6; }
-if test "x$ac_cv_lib_jpeg_jpeg_CreateDecompress" = xyes; then :
+if test "xyes" = xyes; then :
   cat >>confdefs.h <<_ACEOF
 #define HAVE_LIBJPEG 1
 _ACEOF
@@ -64525,7 +64560,7 @@ $as_echo "${with_giflib}" >&6; }
     USE_EXTERNAL_LIBGIF=false
   elif test "x${with_giflib}" = "xsystem"; then
     ac_fn_cxx_check_header_mongrel "$LINENO" "gif_lib.h" "ac_cv_header_gif_lib_h" "$ac_includes_default"
-if test "x$ac_cv_header_gif_lib_h" = xyes; then :
+if test "xyes" = xyes; then :
 
 else
    as_fn_error $? "--with-giflib=system specified, but gif_lib.h not found!" "$LINENO" 5
@@ -64568,7 +64603,7 @@ LIBS=$ac_check_lib_save_LIBS
 fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_gif_DGifGetCode" >&5
 $as_echo "$ac_cv_lib_gif_DGifGetCode" >&6; }
-if test "x$ac_cv_lib_gif_DGifGetCode" = xyes; then :
+if test "xyes" = xyes; then :
   cat >>confdefs.h <<_ACEOF
 #define HAVE_LIBGIF 1
 _ACEOF
@@ -64679,7 +64714,7 @@ else
 $as_echo "yes" >&6; }
 	LIBPNG_FOUND=yes
 fi
-    if test "x${LIBPNG_FOUND}" = "xyes"; then
+    if test "xyes" = "xyes"; then
       # PKG_CHECK_MODULES will set PNG_CFLAGS and PNG_LIBS
       USE_EXTERNAL_LIBPNG=true
       { $as_echo "$as_me:${as_lineno-$LINENO}: result: system" >&5
@@ -64772,7 +64807,7 @@ $as_echo_n "checking for which zlib to use... " >&6; }
     { $as_echo "$as_me:${as_lineno-$LINENO}: result: bundled" >&5
 $as_echo "bundled" >&6; }
   elif test "x${with_zlib}" = "xsystem"; then
-    if test "x${ZLIB_FOUND}" = "xyes"; then
+    if test "xyes" = "xyes"; then
       USE_EXTERNAL_LIBZ=true
       { $as_echo "$as_me:${as_lineno-$LINENO}: result: system" >&5
 $as_echo "system" >&6; }

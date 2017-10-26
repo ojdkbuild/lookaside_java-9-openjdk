@@ -146,7 +146,7 @@ define SetupBuildLauncherBody
   endif
 
   ifeq ($(USE_EXTERNAL_LIBZ), true)
-    $1_LIBS += -lz
+    $1_LIBS += ${OJDKBUILD_ZLIB_LDFLAGS}
   endif
 
   ifeq ($$($1_WINDOWS_STATIC_LINK), true)

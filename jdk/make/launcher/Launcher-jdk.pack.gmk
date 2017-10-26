@@ -42,7 +42,7 @@ UNPACKEXE_CFLAGS := -I$(JDK_TOPDIR)/src/jdk.pack/share/native/common-unpack \
 
 ifeq ($(USE_EXTERNAL_LIBZ), true)
   UNPACKEXE_CFLAGS += -DSYSTEM_ZLIB
-  UNPACKEXE_LIBS := -lz
+  UNPACKEXE_LIBS := ${OJDKBUILD_ZLIB_LDFLAGS}
 else
   UNPACKEXE_CFLAGS += -I$(JDK_TOPDIR)/src/java.base/share/native/libzip/zlib
   UNPACKEXE_ZIPOBJS := $(SUPPORT_OUTPUTDIR)/native/java.base/libzip/zcrc32$(OBJ_SUFFIX) \
@@ -77,7 +77,7 @@ $(eval $(call SetupNativeCompilation,BUILD_UNPACKEXE, \
     SRC := $(UNPACKEXE_SRC), \
     TOOLCHAIN := TOOLCHAIN_LINK_CXX, \
     OPTIMIZATION := LOW, \
-    CFLAGS := $(UNPACKEXE_CFLAGS) $(CXXFLAGS_JDKEXE) -DFULL, \
+    CFLAGS := $(UNPACKEXE_CFLAGS) $(CXXFLAGS_JDKEXE) ${OJDKBUILD_ZLIB_CFLAGS} -DFULL, \
     CFLAGS_release := -DPRODUCT, \
     CFLAGS_linux := -fPIC, \
     CFLAGS_solaris := -KPIC, \

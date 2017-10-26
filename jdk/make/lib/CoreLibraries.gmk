@@ -203,6 +203,8 @@ $(BUILD_LIBJAVA): $(BUILD_LIBFDLIBM)
 BUILD_LIBZIP_EXCLUDES :=
 ifeq ($(USE_EXTERNAL_LIBZ), true)
   LIBZIP_EXCLUDES += zlib
+  LIBZ := ${OJDKBUILD_ZLIB_LDFLAGS}
+  ZLIB_CPPFLAGS := ${OJDKBUILD_ZLIB_CFLAGS}
 endif
 
 BUILD_LIBZIP_REORDER :=
@@ -237,7 +239,7 @@ $(eval $(call SetupNativeCompilation,BUILD_LIBZIP, \
         -export:ZIP_InflateFully -export:ZIP_CRC32 -export:ZIP_FreeEntry, \
     LIBS_unix := -ljvm -ljava $(LIBZ), \
     LIBS_solaris := -lc, \
-    LIBS_windows := jvm.lib $(WIN_JAVA_LIB), \
+    LIBS_windows := jvm.lib $(WIN_JAVA_LIB) $(LIBZ), \
     VERSIONINFO_RESOURCE := $(GLOBAL_VERSION_INFO_RESOURCE), \
     RC_FLAGS := $(RC_FLAGS) \
         -D "JDK_FNAME=zip.dll" \
@@ -351,6 +353,8 @@ ifneq ($(USE_EXTERNAL_LIBZ), true)
           zcrc32.c \
           zutil.c \
       )
+else
+  LIBJLI_CFLAGS += $(ZLIB_CPPFLAGS)
 endif
 
 $(eval $(call SetupNativeCompilation,BUILD_LIBJLI, \
@@ -394,7 +398,7 @@ $(eval $(call SetupNativeCompilation,BUILD_LIBJLI, \
     LIBS_solaris := $(LIBDL) -lc, \
     LIBS_aix := $(LIBDL),\
     LIBS_macosx := -framework Cocoa -framework Security -framework ApplicationServices, \
-    LIBS_windows := advapi32.lib comctl32.lib user32.lib, \
+    LIBS_windows := advapi32.lib comctl32.lib user32.lib $(LIBZ), \
     VERSIONINFO_RESOURCE := $(GLOBAL_VERSION_INFO_RESOURCE), \
     RC_FLAGS := $(RC_FLAGS) \
         -D "JDK_FNAME=jli.dll" \

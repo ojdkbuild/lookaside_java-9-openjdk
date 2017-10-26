@@ -58,6 +58,37 @@ ifneq ($(findstring $(OPENJDK_TARGET_OS), windows aix),)
 
 endif
 
+##########################################################################################
+
+# Copy ojdkbuild libraries
+# zlib
+OJDBUILD_ZLIB_TARGET_LIB = $(LIB_DST_DIR)/$(call SHARED_LIBRARY,ojdkbuild_zlib)
+$(OJDBUILD_ZLIB_TARGET_LIB): $(OJDKBUILD_ZLIB_BUNDLE_LIB_PATH)
+	$(call install-file)
+TARGETS += $(OJDBUILD_ZLIB_TARGET_LIB)
+# nss
+OJDBUILD_NSS_TARGET_LIB = $(LIB_DST_DIR)/$(call SHARED_LIBRARY,ojdkbuild_nss)
+$(OJDBUILD_NSS_TARGET_LIB): $(OJDKBUILD_NSS_BUNDLE_LIB_PATH)
+	$(call install-file)
+TARGETS += $(OJDBUILD_NSS_TARGET_LIB)
+# giflib
+OJDBUILD_GIFLIB_TARGET_LIB = $(LIB_DST_DIR)/$(call SHARED_LIBRARY,ojdkbuild_giflib)
+$(OJDBUILD_GIFLIB_TARGET_LIB): $(OJDKBUILD_GIFLIB_BUNDLE_LIB_PATH)
+	$(call install-file)
+TARGETS += $(OJDBUILD_GIFLIB_TARGET_LIB)
+# libpng
+OJDBUILD_LIBPNG_TARGET_LIB = $(LIB_DST_DIR)/$(call SHARED_LIBRARY,ojdkbuild_libpng)
+$(OJDBUILD_LIBPNG_TARGET_LIB): $(OJDKBUILD_LIBPNG_BUNDLE_LIB_PATH)
+	$(call install-file)
+TARGETS += $(OJDBUILD_LIBPNG_TARGET_LIB)
+# libjpeg-turbo
+OJDBUILD_LIBJPEG_TARGET_LIB = $(LIB_DST_DIR)/$(call SHARED_LIBRARY,ojdkbuild_libjpeg-turbo)
+$(OJDBUILD_LIBJPEG_TARGET_LIB): $(OJDKBUILD_LIBJPEG_BUNDLE_LIB_PATH)
+	$(call install-file)
+TARGETS += $(OJDBUILD_LIBJPEG_TARGET_LIB)
+
+##########################################################################################
+
 ################################################################################
 # Copy the microsoft runtime libraries on windows
 ifeq ($(OPENJDK_TARGET_OS), windows)
