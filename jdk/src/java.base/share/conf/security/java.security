@@ -66,6 +66,7 @@ security.provider.tbd=SunPKCS11 ${java.home}/conf/security/sunpkcs11-solaris.cfg
 #endif
 security.provider.tbd=SUN
 security.provider.tbd=SunRsaSign
+security.provider.tbd=SunEC
 security.provider.tbd=SunJSSE
 security.provider.tbd=SunJCE
 security.provider.tbd=SunJGSS
