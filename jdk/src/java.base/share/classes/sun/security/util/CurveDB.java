@@ -167,6 +167,7 @@ public class CurveDB {
     static {
         Pattern nameSplitPattern = Pattern.compile(SPLIT_PATTERN);
 
+        /* SEC2 prime curves */
         add("secp256r1 [NIST P-256, X9.62 prime256v1]", "1.2.840.10045.3.1.7", PD,
             "FFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF",
             "FFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFC",
